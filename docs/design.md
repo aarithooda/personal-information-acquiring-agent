@@ -61,3 +61,17 @@ Known limitations, accepted for V1:
 - **Anthropic has no RSS feed**, so it is not a source yet.
 - Adapters are `parse_*` (pure, tested on saved real responses in `tests/fixtures`) plus a
   thin `fetch`. All network access goes through `http.get_with_retry`.
+
+## Checkpoint and catch-up rules (M3)
+
+- **Per-source window:** `since = last successful fetch - 6h overlap` (first run: 3 days back;
+  never more than 14 days back), `until = now`. Overlap absorbs late-indexed items; dedup makes it free.
+- **"New" is state, not time:** items with `briefing_id IS NULL`. Publication date is irrelevant.
+- **Write order:** store items, then advance the source cursor; a crash between them only causes a harmless re-fetch.
+- **One transaction** creates the briefing row (= the checkpoint) and marks its items briefed.
+- **Failures:** a failed source keeps its old cursor and catches up later; the briefing names it.
+  If *every* source fails, nothing is committed and the checkpoint does not move.
+- **Truncated fetches (arXiv cap):** decision for V1 is that the cursor still advances. The cap is
+  deliberate sampling (newest N), not a promise of completeness. Revisit in V2 when interest
+  matching can sift arXiv by topic instead of by recency.
+- Times are rendered in UTC. `pia status` shows the checkpoint, unbriefed count and source health.
