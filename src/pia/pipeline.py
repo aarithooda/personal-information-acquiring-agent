@@ -1,20 +1,21 @@
-"""The V1 pipeline: collect -> select what is new -> render -> commit the briefing.
+"""The V1 pipeline: collect -> prepare the briefing -> commit it.
 
-This is deterministic orchestration: the steps and their order are fixed in code.
-Nothing here decides what to do next based on an LLM's opinion.
+This is deterministic orchestration: the steps and their order are fixed in code. What
+goes into the briefing (and whether an LLM is involved) is the injected `prepare` step;
+nothing here decides what to do next based on a model's opinion.
 """
 
 import sqlite3
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
 import httpx
 
-from pia.briefing.render import render_plain
+from pia.briefing.content import Prepare
+from pia.briefing.render import plain_prepare
 from pia.collect import SourceResult, collect
 from pia.sources.base import Source
-from pia.state import commit_briefing, get_checkpoint, pending_items
+from pia.state import commit_briefing, get_checkpoint
 
 
 class AllSourcesFailed(Exception):
@@ -26,7 +27,7 @@ class BriefingResult:
     briefing_id: int
     covers_from: datetime | None
     covers_until: datetime
-    items: list[sqlite3.Row]
+    items: list[sqlite3.Row]  # the items shown to the user
     source_results: list[SourceResult]
     markdown: str
 
@@ -37,7 +38,7 @@ def run_briefing(
     sources: list[Source],
     now: datetime,
     *,
-    render: Callable = render_plain,
+    prepare: Prepare = plain_prepare,
     **collect_options,
 ) -> BriefingResult:
     checkpoint = get_checkpoint(conn)
@@ -47,8 +48,7 @@ def run_briefing(
         errors = "; ".join(f"{r.name}: {r.error}" for r in results)
         raise AllSourcesFailed(errors)
 
-    items = pending_items(conn)
-    markdown = render(items, checkpoint, now, results)  # if this raises, nothing was committed
+    content = prepare(conn, checkpoint, now, results)  # if this raises, nothing was committed
 
     # The last step, and the only one that moves the checkpoint.
     briefing_id = commit_briefing(
@@ -56,7 +56,8 @@ def run_briefing(
         covers_from=checkpoint,
         covers_until=now,
         created_at=now,
-        rendered_md=markdown,
-        item_ids=[row["id"] for row in items],
+        rendered_md=content.markdown,
+        shown_ids=[row["id"] for row in content.shown],
+        skipped_ids=[row["id"] for row in content.skipped],
     )
-    return BriefingResult(briefing_id, checkpoint, now, items, results, markdown)
+    return BriefingResult(briefing_id, checkpoint, now, content.shown, results, content.markdown)

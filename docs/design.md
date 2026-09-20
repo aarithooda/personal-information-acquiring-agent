@@ -100,3 +100,29 @@ Measured on 158 real items (2026-09-20):
   zero popularity signal. Cross-source items did score higher (3 sources: 4.0 vs 2.7 for one source).
 - **Design consequence for M5:** select by rank (top N by importance, then deterministic signal
   strength), never by an absolute threshold.
+
+## Briefing: adaptive size, ranking, editor (M5)
+
+- **Size scales with time away** (user requirement): "Worth knowing" slots = `max(1, floor(1.5 x days))`
+  -> 1 day: 1, 3 days (first run): 4, 10 days: 15. One-line extras: 2 per headline slot. Days are capped at
+  the 14-day fetch lookback. `HEADLINES_PER_DAY` / `ALSO_PER_HEADLINE` in `briefing/budget.py` are scale
+  factors, not per-item cutoffs.
+- **The budget is a ceiling.** The editor (stage 2) sees a shortlist of `2 x budget + 2` and may pick fewer.
+- **Ranking is relative, never thresholded:** `importance + popularity percentile (per source, within
+  this window) + cross-source boost`. `other` and importance-1 ("noise") items are never shown.
+- **Two LLM stages, different jobs:** stage 1 scores each item alone (cheap, generous); stage 2 (gpt-oss-120b)
+  compares the shortlist side by side (listwise) and writes 2-4 sentence explanations from the provided
+  text only ("do not invent facts").
+- **Graceful degradation:** editor fails -> ship the deterministic top-N with summaries and say so.
+  Triage fails completely -> `EnrichmentFailed`, nothing committed, checkpoint unmoved. Triage partly
+  fails -> brief on what exists; the rest stays pending for the next run.
+- **Item settlement:** shown = `briefed`; considered but left out = `skipped` (both attached to the
+  briefing, never "new" again); not-yet-triaged items stay untouched.
+- `run_briefing` takes an injected `prepare` step (plain list or LLM curator), so orchestration stays
+  generic and testable.
+
+Observed live (2026-09-20, same 158 items): headlines 1 / 4 / 15 for 1 / 3 / 10 days. Limits found:
+- Explanations are only as good as the source text. Papers have abstracts; HN links have only a title, so
+  they are hard to summarize. Fetching article text is a V4 (deep dive) job.
+- In all three runs the editor filled every slot. The "choose fewer" path is covered by unit tests but
+  not yet observed with the real model; watch for padding and tune the editor prompt if it persists.

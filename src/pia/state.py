@@ -129,12 +129,15 @@ def commit_briefing(
     covers_until: datetime,
     created_at: datetime,
     rendered_md: str,
-    item_ids: list[int],
+    shown_ids: list[int],
+    skipped_ids: list[int] = (),
 ) -> int:
-    """Save the briefing AND mark its items as briefed, or do neither.
+    """Save the briefing AND settle its items, or do neither.
 
-    The checkpoint only exists as this row, so moving it and marking items are one
-    atomic step: a crash can never advance the checkpoint without the items being marked.
+    Shown items become 'briefed'; items that were considered but deliberately left out become
+    'skipped'. Both are attached to this briefing so they are never offered as "new" again.
+    The checkpoint only exists as this row, so moving it and marking items are one atomic
+    step: a crash can never advance the checkpoint without the items being marked.
     """
     with conn:  # one transaction: commits on success, rolls back on any exception
         cursor = conn.execute(
@@ -150,6 +153,10 @@ def commit_briefing(
         briefing_id = cursor.lastrowid
         conn.executemany(
             "UPDATE items SET briefing_id = ?, status = 'briefed' WHERE id = ?",
-            [(briefing_id, item_id) for item_id in item_ids],
+            [(briefing_id, item_id) for item_id in shown_ids],
+        )
+        conn.executemany(
+            "UPDATE items SET briefing_id = ?, status = 'skipped' WHERE id = ?",
+            [(briefing_id, item_id) for item_id in skipped_ids],
         )
     return briefing_id

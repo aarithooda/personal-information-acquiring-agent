@@ -91,11 +91,11 @@ def test_briefed_items_are_linked_to_their_briefing(conn):
 def test_a_crash_before_the_briefing_is_saved_loses_nothing(conn):
     source = FakeSource("a", [make_item("a", 1, T0 - HOUR)])
 
-    def exploding_render(*args):
+    def exploding_prepare(*args):
         raise RuntimeError("render crashed")
 
     with pytest.raises(RuntimeError):
-        run_briefing(conn, None, [source], now=T0, render=exploding_render)
+        run_briefing(conn, None, [source], now=T0, prepare=exploding_prepare)
     assert briefing_count(conn) == 0
     assert get_checkpoint(conn) is None  # checkpoint did not move
 

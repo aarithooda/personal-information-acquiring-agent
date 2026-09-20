@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
+from pia.briefing.curate import EnrichmentFailed, make_curator
 from pia.collect import collect
 from pia.config import DEFAULT_DB, DEFAULT_SOURCES, ConfigError, get_groq_api_key
 from pia.db import connect
@@ -59,12 +60,20 @@ def _briefing(settings: Settings) -> None:
     conn = connect(settings.db)
     sources = load_sources(settings.config)
     now = datetime.now(timezone.utc)
-    with httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=20, follow_redirects=True) as client:
-        with console.status("Checking sources..."):
+    with _http_client() as client:
+        try:
+            llm = make_llm(client)
+        except ConfigError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        with console.status("Checking sources and reading what's new..."):
             try:
-                result = run_briefing(conn, client, sources, now)
+                result = run_briefing(conn, client, sources, now, prepare=make_curator(llm))
             except AllSourcesFailed as exc:
                 console.print(f"[red]Could not reach any source, so nothing was recorded.[/red]\n{exc}")
+                raise typer.Exit(1)
+            except EnrichmentFailed as exc:
+                console.print(f"[red]Nothing was recorded: {exc}[/red]")
                 raise typer.Exit(1)
     console.print(Markdown(result.markdown))
 

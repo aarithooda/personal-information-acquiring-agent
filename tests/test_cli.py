@@ -52,6 +52,49 @@ def test_enrich_runs_stage_one_and_shows_what_the_model_decided(tmp_path, monkey
     assert "A big model." in result.output and "hn item 1" in result.output
 
 
+def test_default_command_prints_a_briefing_and_records_the_checkpoint(tmp_path, monkeypatch):
+    import pia.cli
+    from fakes import SmartLLM
+
+    db = tmp_path / "pia.db"
+    source = FakeSource("a", [make_item("a", n, T0) for n in range(3)])
+    monkeypatch.setattr(pia.cli, "load_sources", lambda path: [source])
+    monkeypatch.setattr(pia.cli, "make_llm", lambda client: SmartLLM())
+
+    result = runner.invoke(app, ["--db", str(db)])
+    assert result.exit_code == 0
+    assert "Worth knowing" in result.output
+    conn = connect(db)
+    assert conn.execute("SELECT COUNT(*) FROM briefings").fetchone()[0] == 1
+
+
+def test_default_command_without_a_key_exits_cleanly_and_records_nothing(tmp_path, monkeypatch):
+    import pia.cli
+
+    def no_key(client):
+        raise pia.cli.ConfigError("GROQ_API_KEY not found")
+
+    monkeypatch.setattr(pia.cli, "load_sources", lambda path: [FakeSource("a", [make_item("a", 1, T0)])])
+    monkeypatch.setattr(pia.cli, "make_llm", no_key)
+    db = tmp_path / "pia.db"
+    result = runner.invoke(app, ["--db", str(db)])
+    assert result.exit_code == 1 and "GROQ_API_KEY" in result.output
+    assert connect(db).execute("SELECT COUNT(*) FROM briefings").fetchone()[0] == 0
+
+
+def test_default_command_reports_total_triage_failure_and_records_nothing(tmp_path, monkeypatch):
+    import pia.cli
+    from fakes import SmartLLM
+    from pia.llm.client import LLMError
+
+    monkeypatch.setattr(pia.cli, "load_sources", lambda path: [FakeSource("a", [make_item("a", 1, T0)])])
+    monkeypatch.setattr(pia.cli, "make_llm", lambda client: SmartLLM(triage_error=LLMError("down")))
+    db = tmp_path / "pia.db"
+    result = runner.invoke(app, ["--db", str(db)])
+    assert result.exit_code == 1 and "nothing was recorded" in result.output.lower()
+    assert connect(db).execute("SELECT COUNT(*) FROM briefings").fetchone()[0] == 0
+
+
 def test_status_on_a_fresh_database(tmp_path):
     result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "status"])
     assert result.exit_code == 0
