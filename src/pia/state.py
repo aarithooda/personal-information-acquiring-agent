@@ -77,6 +77,51 @@ def pending_items(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def items_needing_enrichment(conn: sqlite3.Connection, limit: int | None = None) -> list[sqlite3.Row]:
+    """New-to-the-user items the LLM has not yet triaged (newest first)."""
+    query = """SELECT * FROM items WHERE status = 'discovered' AND briefing_id IS NULL
+               ORDER BY COALESCE(published_at, discovered_at) DESC, id DESC"""
+    params: tuple = ()
+    if limit is not None:
+        query += " LIMIT ?"
+        params = (limit,)
+    return conn.execute(query, params).fetchall()
+
+
+def enriched_items(conn: sqlite3.Connection, prompt_version: str) -> list[sqlite3.Row]:
+    """Triaged items not yet shown to the user, most important first, with the triage attached."""
+    return conn.execute(
+        """SELECT i.*, e.category, e.importance, e.summary
+           FROM items i JOIN enrichments e ON e.item_id = i.id AND e.prompt_version = ?
+           WHERE i.status = 'enriched' AND i.briefing_id IS NULL
+           ORDER BY e.importance DESC, COALESCE(i.published_at, i.discovered_at) DESC""",
+        (prompt_version,),
+    ).fetchall()
+
+
+def save_enrichments(
+    conn: sqlite3.Connection,
+    results: dict[int, object],
+    *,
+    model: str,
+    prompt_version: str,
+    now: datetime,
+) -> None:
+    """Persist one batch of triage results and mark those items enriched, atomically.
+
+    `results` maps item id -> an object with category / importance / summary.
+    """
+    with conn:
+        for item_id, result in results.items():
+            conn.execute(
+                """INSERT OR REPLACE INTO enrichments
+                   (item_id, model, prompt_version, category, importance, summary, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (item_id, model, prompt_version, result.category, result.importance, result.summary, _iso(now)),
+            )
+            conn.execute("UPDATE items SET status = 'enriched' WHERE id = ? AND status = 'discovered'", (item_id,))
+
+
 def commit_briefing(
     conn: sqlite3.Connection,
     *,

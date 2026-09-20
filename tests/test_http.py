@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from pia.http import SourceError, get_with_retry
+from pia.http import SourceError, get_with_retry, request_with_retry
 
 
 def make_client(handler):
@@ -66,6 +66,36 @@ def test_gives_up_after_retries_and_raises_source_error():
     with pytest.raises(SourceError):
         get_with_retry(make_client(script), "https://x.test", retries=2, sleep=script.sleep)
     assert script.calls == 3  # first attempt + 2 retries
+
+
+def test_post_resends_the_same_json_body_and_headers_on_retry():
+    bodies, auth = [], []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(request.content)
+        auth.append(request.headers.get("authorization"))
+        return httpx.Response(429 if len(bodies) == 1 else 200, headers={"Retry-After": "2"}, text="ok")
+
+    resp = request_with_retry(
+        make_client(handler),
+        "POST",
+        "https://x.test/chat",
+        json={"model": "m"},
+        headers={"Authorization": "Bearer secret"},
+        sleep=lambda s: None,
+    )
+    assert resp.status_code == 200
+    assert bodies[0] == bodies[1] == b'{"model":"m"}'
+    assert auth == ["Bearer secret", "Bearer secret"]
+
+
+def test_error_messages_never_contain_request_headers():
+    script = Script(httpx.Response(401))
+    with pytest.raises(SourceError) as excinfo:
+        request_with_retry(
+            make_client(script), "POST", "https://x.test/chat", headers={"Authorization": "Bearer TOPSECRET"}
+        )
+    assert "TOPSECRET" not in str(excinfo.value)
 
 
 def test_retries_network_errors():

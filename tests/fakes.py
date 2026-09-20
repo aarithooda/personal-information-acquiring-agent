@@ -8,14 +8,38 @@ from pia.sources.base import within_window
 T0 = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
 
 
-def make_item(source: str, n: int, published_at: datetime | None) -> RawItem:
+def make_item(source: str, n: int, published_at: datetime | None, **extra) -> RawItem:
     return RawItem(
         source=source,
         external_id=str(n),
         url=f"https://example.com/{source}/{n}",
         title=f"{source} item {n}",
         published_at=published_at,
+        **extra,
     )
+
+
+class FakeLLM:
+    """Replays scripted responses (dicts, or exceptions to raise) and records every call."""
+
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.calls: list[dict] = []
+
+    def complete_json(self, **kwargs) -> dict:
+        self.calls.append(kwargs)
+        response = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+
+def entry(index: int, category="ai", importance=3, summary="A summary.") -> dict:
+    return {"index": index, "category": category, "importance": importance, "summary": summary}
+
+
+def batch_response(*entries: dict) -> dict:
+    return {"results": list(entries)}
 
 
 class FakeSource:

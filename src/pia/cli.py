@@ -11,12 +11,16 @@ import typer
 from rich.console import Console
 from rich.markdown import Markdown
 
-from pia.config import DEFAULT_DB, DEFAULT_SOURCES
+from pia.collect import collect
+from pia.config import DEFAULT_DB, DEFAULT_SOURCES, ConfigError, get_groq_api_key
 from pia.db import connect
 from pia.http import USER_AGENT
+from pia.llm.client import LLM, GroqClient
+from pia.llm.enrich import enrich_pending
+from pia.llm.prompts import PROMPT_VERSION
 from pia.pipeline import AllSourcesFailed, run_briefing
 from pia.sources.registry import load_sources
-from pia.state import get_checkpoint, last_fetch_runs, pending_items
+from pia.state import enriched_items, get_checkpoint, last_fetch_runs, pending_items
 
 app = typer.Typer(add_completion=False, help="Personal Intelligence Agent: what happened since I last checked?")
 
@@ -63,6 +67,46 @@ def _briefing(settings: Settings) -> None:
                 console.print(f"[red]Could not reach any source, so nothing was recorded.[/red]\n{exc}")
                 raise typer.Exit(1)
     console.print(Markdown(result.markdown))
+
+
+def _http_client() -> httpx.Client:
+    return httpx.Client(headers={"User-Agent": USER_AGENT}, timeout=60, follow_redirects=True)
+
+
+def make_llm(client: httpx.Client) -> LLM:
+    return GroqClient(get_groq_api_key(), client)
+
+
+@app.command("collect")
+def collect_command(ctx: typer.Context) -> None:
+    """Fetch every source and store new items. Does not create a briefing."""
+    conn = connect(ctx.obj.db)
+    with _http_client() as client:
+        results = collect(conn, client, load_sources(ctx.obj.config), datetime.now(timezone.utc))
+    for r in results:
+        detail = f"{r.inserted} new, {r.merged} already known" if r.ok else f"FAILED: {r.error}"
+        typer.echo(f"  {r.name:<10} {detail}")
+
+
+@app.command()
+def enrich(
+    ctx: typer.Context,
+    limit: int = typer.Option(None, help="Only triage this many items (handy while testing)."),
+) -> None:
+    """Have the LLM triage new items (category, importance, summary) and show the results."""
+    conn = connect(ctx.obj.db)
+    with _http_client() as client:
+        try:
+            llm = make_llm(client)
+        except ConfigError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1)
+        report = enrich_pending(conn, llm, datetime.now(timezone.utc), limit=limit)
+
+    typer.echo(f"Enriched {report.enriched}; {report.remaining} still pending"
+               + (" (stopped early after repeated failures)" if report.stopped_early else ""))
+    for row in enriched_items(conn, PROMPT_VERSION):
+        typer.echo(f"  {row['importance']} {row['category']:<9} {row['summary']}  [{row['source']}: {row['title'][:60]}]")
 
 
 @app.command()

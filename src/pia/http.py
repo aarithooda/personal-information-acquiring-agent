@@ -28,20 +28,30 @@ def _retry_delay(response: httpx.Response | None, attempt: int, max_wait: float)
     return min(2.0**attempt, max_wait)
 
 
-def get_with_retry(
+def get_with_retry(client: httpx.Client, url: str, *, params: dict | None = None, **options) -> httpx.Response:
+    return request_with_retry(client, "GET", url, params=params, **options)
+
+
+def request_with_retry(
     client: httpx.Client,
+    method: str,
     url: str,
     *,
-    params: dict | None = None,
     retries: int = 3,
     max_wait: float = 30,
     sleep: Callable[[float], None] = time.sleep,
+    **request_kwargs,  # params / json / headers, passed straight to httpx
 ) -> httpx.Response:
+    """Send a request, retrying only failures that can plausibly succeed later.
+
+    Error messages contain the URL and status only, never headers, so an API key in an
+    Authorization header cannot leak into logs or tracebacks.
+    """
     last_problem = "no attempt made"
     for attempt in range(retries + 1):
         response = None
         try:
-            response = client.get(url, params=params)
+            response = client.request(method, url, **request_kwargs)
         except httpx.TransportError as exc:  # timeouts, DNS, connection resets
             last_problem = f"network error: {exc}"
         else:

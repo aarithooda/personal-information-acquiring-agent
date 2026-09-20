@@ -75,3 +75,28 @@ Known limitations, accepted for V1:
   deliberate sampling (newest N), not a promise of completeness. Revisit in V2 when interest
   matching can sift arXiv by topic instead of by recency.
 - Times are rendered in UTC. `pia status` shows the checkpoint, unbriefed count and source health.
+
+## LLM stage 1: triage (M4)
+
+- **Provider/models:** Groq via plain `httpx` (OpenAI-compatible API), not the vendor SDK: an LLM call
+  is an HTTP POST, so it reuses `request_with_retry` and the fake-transport tests. Models:
+  `openai/gpt-oss-20b` (stage 1), `openai/gpt-oss-120b` (stage 2, M5). The Llama models on Groq do
+  NOT support strict JSON-schema output; the gpt-oss models do (checked against Groq docs 2026-09-20).
+- **Strict structured output** (`response_format: json_schema, strict: true`) = constrained decoding.
+  We still validate each entry with Pydantic (duplicate index, blank summary, ...) and drop bad entries.
+- **Failure policy:** retry happens at the level of the *run*: items the model skips or botches stay
+  `discovered` and are retried next time. Each batch is persisted as soon as it succeeds. After
+  2 consecutive failed batches we stop (circuit breaker) instead of hammering an API that is down or
+  rate-limited. Known gap: a "poison" batch that always fails would be retried forever (add an
+  attempts counter if it ever happens).
+- **Prompt-injection stance:** scraped titles/text are untrusted. They are delimited as data, the
+  system prompt says never to obey them, and the schema only permits a category, a score and a
+  sentence, so the worst a hostile item can do is mis-score itself. The LLM has no tools or actions.
+- **Every enrichment records `model` + `prompt_version`** so results can be recomputed later.
+
+Measured on 158 real items (2026-09-20):
+- Free tier is rate limited (many 429s, `Retry-After` 11-18s); the retry layer absorbed it, 2m24s total.
+- Scores are NOT calibrated: 21% got importance 4, none got 5, and arXiv agent papers scored high with
+  zero popularity signal. Cross-source items did score higher (3 sources: 4.0 vs 2.7 for one source).
+- **Design consequence for M5:** select by rank (top N by importance, then deterministic signal
+  strength), never by an absolute threshold.
