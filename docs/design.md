@@ -46,3 +46,18 @@ points; it never touches timestamps, IDs, dedup or the checkpoint.
 M1 core (schema, normalize, dedup) -> M2 source adapters -> M3 checkpoint + new-items
 query, no LLM -> M4 LLM enrichment -> M5 selection, stage 2, render -> M6 failure
 handling -> M7 polish.
+
+## Source notes (M2)
+
+Verified live on 2026-09-20 (7-day window): arXiv, HF Daily Papers, HN (Algolia), GitHub
+search, and RSS feeds for Quanta, DeepMind, OpenAI and the HF blog all work. About 310 items
+per week in total, with a paper seen by three sources stored once.
+
+Known limitations, accepted for V1:
+- **arXiv is capped** at `max_results` (newest first) and 5 days of `cs.AI` alone is ~500
+  papers. A capped fetch drops older papers in the window. M3 must decide how the per-source
+  cursor behaves when a fetch was truncated. HF Daily Papers covers the important ones.
+- **GitHub finds repos *created* in the window**, so an old repo that suddenly goes viral is missed.
+- **Anthropic has no RSS feed**, so it is not a source yet.
+- Adapters are `parse_*` (pure, tested on saved real responses in `tests/fixtures`) plus a
+  thin `fetch`. All network access goes through `http.get_with_retry`.

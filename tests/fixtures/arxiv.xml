@@ -1,0 +1,161 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/D70BKeAsw+sfAN5U8FeZhHrqMRQ</id>
+  <title>arXiv Query: search_query=cat:cs.AI AND submittedDate:"202609150000 TO 202609202359"&amp;id_list=&amp;start=0&amp;max_results=5</title>
+  <updated>2026-09-20T16:39:28Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=cat:cs.AI+AND+submittedDate:%22202609150000+TO+202609202359%22&amp;start=0&amp;max_results=5&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>5</opensearch:itemsPerPage>
+  <opensearch:totalResults>496</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2609.20822v1</id>
+    <title>Coding Agents with an Obstacle-Aware Harness for Safe Robot Manipulation</title>
+    <updated>2026-09-17T17:59:58Z</updated>
+    <link href="https://arxiv.org/abs/2609.20822v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.20822v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Coding agents have emerged as a promising paradigm for robot manipulation: a language model writes the robot controller as a program, and agents built in this way now operate robots without robot-specific training.Whether this paradigm is also safe, however, has not been asked. We evaluate coding agent under a safety constraint, where each task pairs a manipulation goal with an obstacle the robot must not touch. The agent pursues the goal but collides with the obstacle in most cases, treating task completion as its sole objective while neglecting safety. The agent reasons about the obstacle in its traces, and the prompt already forbids touching it, so neither perception nor instruction is at fault; the fault lies in the planning, where the stated constraint never becomes a priority. By decomposing manipulation into a route phase and a contact-rich moment, we locate the source of the failure. Along the route, the model cannot prioritize the safety constraint, having no notion of a clearing route and none of replanning once a chosen route becomes infeasible. At the contact, it is unaware that contact execution is bounded by the same constraint. To close this gap, we present SafeHarness, which equips the model with two obstacle-aware harnesses that enable it to prioritize the safety constraint. Obstacle-aware route planning grounds the objects as bounding boxes and draws candidate routes over them as sequences of waypoints. The agent then plans a route in advance, verifies it, replans when necessary, and only then executes it. Obstacle-aware contact execution instead selects the contact position so that the contact itself avoids the obstacle. SafeHarness attains 71.9% task success and 87.5% collision avoidance, surpassing the previous SOTA by 6.5% and 27.0%, respectively. These results are $2.3\times$ and $1.5\times$ those of the same agent without harnesses.</summary>
+    <category term="cs.RO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-17T17:59:58Z</published>
+    <arxiv:primary_category term="cs.RO"/>
+    <author>
+      <name>Bingxin Xu</name>
+    </author>
+    <author>
+      <name>Yuzhang Shang</name>
+    </author>
+    <author>
+      <name>Zhen Dong</name>
+    </author>
+    <author>
+      <name>Emilio Ferrara</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.20820v1</id>
+    <title>Workspace Models: Lightweight Robotic Memory via Saliency-Driven Supervision</title>
+    <updated>2026-09-17T17:59:53Z</updated>
+    <link href="https://arxiv.org/abs/2609.20820v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.20820v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Complex robotic manipulation tasks frequently require a long-term memory of past events and actions. As conditioning on full histories renders policies prone to spurious correlations and degrades performance, many approaches to policy memory involve compressing historical information through expensive VLM queries in-the-loop to process only task-salient information. In this paper, we propose an alternative approach in which computationally intensive VLM queries are made during train-time to learn a lightweight latent memory that can be efficiently queried at deployment time. Our representation, which we call the \textbf{workspace token}, is trained by (1) using a VLM to identify current and historical information necessary for completing a task, then (2) distilling these into the workspace token using a set-reconstruction decoder loss. In both simulation and hardware, we show that the workspace token can be used as a drop-in replacement for observations during deployment, enabling policies to solve memory-intensive tasks without the need for VLM reasoning in-the-loop. Interestingly, we found that workspace tokens are not only more lightweight but also lead to better policy performance.</summary>
+    <category term="cs.RO" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-17T17:59:53Z</published>
+    <arxiv:comment>26 pages; CoRL 2026; 11 figures</arxiv:comment>
+    <arxiv:primary_category term="cs.RO"/>
+    <author>
+      <name>Nitish Dashora</name>
+    </author>
+    <author>
+      <name>Douglas Chen</name>
+    </author>
+    <author>
+      <name>Idan Shenfeld</name>
+    </author>
+    <author>
+      <name>John Marangola</name>
+    </author>
+    <author>
+      <name>Pulkit Agrawal</name>
+    </author>
+    <author>
+      <name>Max Simchowitz</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.20817v1</id>
+    <title>FAMOS: Feed-Forward 3D Articulation Modeling from Sparse Observations</title>
+    <updated>2026-09-17T17:59:40Z</updated>
+    <link href="https://arxiv.org/abs/2609.20817v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.20817v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Modeling articulated objects from sparse monocular views is challenging because each observation reveals only partial geometry and motion evidence. Most feed-forward methods infer articulation from a single observation and therefore rely heavily on learned category-level shape priors. We present FAMOS, a feed-forward model that predicts movable-part segmentation and joint parameters from a sparse, unordered set of partial point clouds. Our model jointly reasons over multiple observations and naturally supports a variable number of inputs, including a single view. To aggregate articulation cues across observations, we introduce a Multi-state Articulation Transformer with alternating state-wise and global attention. We further propose an observed articulation span objective that supervises the motion range each part exhibits across the input observations, encouraging the model to leverage the full observation set. To overcome the limited scale and diversity of existing datasets, we introduce a procedural data generator that synthesizes self-annotated assets during training. Experiments on PartNet-Mobility, ACD, and ArtiCraft-10K demonstrate consistent improvements over both feed-forward and optimization-based baselines. Project page: https://kevinqu7.github.io/famos</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.RO" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-17T17:59:40Z</published>
+    <arxiv:comment>Project page: https://kevinqu7.github.io/famos</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Kevin Qu</name>
+    </author>
+    <author>
+      <name>Tao Sun</name>
+    </author>
+    <author>
+      <name>Massimiliano Viola</name>
+    </author>
+    <author>
+      <name>Liyuan Zhu</name>
+    </author>
+    <author>
+      <name>Zhizhuo Zhou</name>
+    </author>
+    <author>
+      <name>Sayan Deb Sarkar</name>
+    </author>
+    <author>
+      <name>Konrad Schindler</name>
+    </author>
+    <author>
+      <name>Iro Armeni</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.20816v1</id>
+    <title>Paint-Anything: Unified Any-Color Control for Image Generation and Editing</title>
+    <updated>2026-09-17T17:59:30Z</updated>
+    <link href="https://arxiv.org/abs/2609.20816v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.20816v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Professional design requires any-color control: the ability to specify an object's target color with any 24-bit hex value for image generation and editing. Prior work has explored color generation, editing, and colorization, but often relies on dedicated color representations or specialized inference procedures. Advances in large language models offer a simpler starting point: even compact models can associate hex values with color semantics. We present Paint-Anything, which learns a shared hex-prompt interface for generation and editing through object-level color supervision. We develop a data pipeline that constructs Paint-500K from real images through object grounding, perceptual color labeling, and editing-pair synthesis. Since shadows make real-image labels only approximate colors, we complement this supervision with pure-color anchors whose pixels exactly match their paired hex values. These anchors are used only at high-noise timesteps, leaving low-noise training to natural images. We further introduce Any Color Benchmark (ACBench), comprising ACBench-T2I and ACBench-Edit, to measure object-level hex color fidelity across both tasks. On FLUX.2-4B, Paint-Anything improves ACBench-T2I and ACBench-Edit scores by 85.3% and 28.3%, respectively, relative to the base model, with ablations supporting the training recipe. It also achieves the highest average CompColor score among the compared methods.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-17T17:59:30Z</published>
+    <arxiv:comment>29 pages, Seed Technical Report</arxiv:comment>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Ji Xie</name>
+    </author>
+    <author>
+      <name>Dewei Zhou</name>
+    </author>
+    <author>
+      <name>Xinyu Huang</name>
+    </author>
+    <author>
+      <name>Zhennan Chen</name>
+    </author>
+    <author>
+      <name>Xun Wang</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2609.20815v1</id>
+    <title>ERCPMP-Gx: Endoscopic Image and Video Dataset for Morphological, Histopathological, and Genomic Characterization of Colorectal Polyposis</title>
+    <updated>2026-09-17T17:59:28Z</updated>
+    <link href="https://arxiv.org/abs/2609.20815v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2609.20815v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Hereditary polyposis syndromes can be precursor lesions to colorectal cancer and are associated with a broad spectrum of extracolonic tumors. Early identification and accurate classification of these syndromes are essential for timely diagnosis, individualized patient management, and targeted surveillance strategies for affected families. However, public endoscopic datasets are largely organized around the individual sporadic polyp, and none links the polyposis phenotype to histopathology and germline findings at the patient level. Here, we present ERCPMP-Gx, an endoscopic, histopathological, and genomic dataset developed to support the application of artificial intelligence (AI) in the recognition, characterization, and classification of colorectal polyposis. Most procedures were performed using the Olympus EVIS X1 system with white-light endoscopy (WLE), narrow-band imaging (NBI), magnifying NBI (M-NBI), and NBI with near focus modes, yielding 160 images and accompanying video clips. Approximately eighty percent of cases represent clinically and/or genetically confirmed hereditary polyposis syndromes (PG), including familial adenomatous polyposis (FAP), Peutz-Jeghers syndrome (PJS), juvenile polyposis syndrome (JPS), and ganglioneuroma syndrome (GNS), while the remaining twenty percent comprise non-hereditary polyps and polyp-mimicking lesions with overlapping morphological features (Non-PG), included to support differential classification. Each released record is linked, where available, to standardized endoscopic annotations, representative histopathology, and clinically reported germline findings, forming an AI-ready, patient-level annotation framework. The dataset is publicly accessible at Mendeley (https://doi.org/10.17632/nzyfc544bx.2). For the latest updates and further information, readers are referred to the DataBioX website: https://databiox.com.</summary>
+    <category term="cs.CV" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2026-09-17T17:59:28Z</published>
+    <arxiv:primary_category term="cs.CV"/>
+    <author>
+      <name>Zahra Ghaffari</name>
+    </author>
+    <author>
+      <name>Massih Bahar</name>
+    </author>
+    <author>
+      <name>Mojgan Forootan</name>
+    </author>
+    <author>
+      <name>Ali Darvishi</name>
+    </author>
+    <author>
+      <name>Hamidreza Bolhasani</name>
+    </author>
+  </entry>
+</feed>

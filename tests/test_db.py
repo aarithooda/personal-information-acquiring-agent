@@ -45,6 +45,12 @@ def test_connect_applies_migrations_once(tmp_path):
     second.close()
 
 
+def test_connect_creates_missing_parent_directories(tmp_path):
+    path = tmp_path / "does" / "not" / "exist" / "pia.db"
+    connect(path).close()
+    assert path.exists()
+
+
 def test_new_item_is_inserted_with_utc_timestamps_and_discovered_status(conn):
     assert upsert_item(conn, raw(), now=T0) == "inserted"
     (row,) = all_items(conn)

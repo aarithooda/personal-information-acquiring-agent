@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+ <channel>
+  <atom:link href="https://huggingface.co/blog/feed.xml" rel="self" type="application/rss+xml"/>
+  <title>Hugging Face - Blog</title>
+  <link>https://huggingface.co/blog</link>
+  <description>The Hugging Face blog</description>
+  <language>en-US</language>
+  <item>
+   <title>Your Agent Aced the Task. Will It Do It Again?</title>
+   <pubDate>Tue, 15 Sep 2026 16:00:44 GMT</pubDate>
+   <link>https://huggingface.co/blog/ibm-research/altk-evolve-consistency</link>
+   <guid isPermaLink="false">https://huggingface.co/blog/ibm-research/altk-evolve-consistency</guid>
+  </item>
+  <item>
+   <title>Async GRPO with LoRA across HF Jobs: a bucket, a proxy, and no NCCL</title>
+   <pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>
+   <link>https://huggingface.co/blog/asyncgrpo-lora-hfjobs</link>
+   <guid isPermaLink="true">https://huggingface.co/blog/asyncgrpo-lora-hfjobs</guid>
+  </item>
+  <item>
+   <title>Rebuilding AUTOMATIC1111 with Gradio Workflow</title>
+   <pubDate>Thu, 10 Sep 2026 00:00:00 GMT</pubDate>
+   <link>https://huggingface.co/blog/gradio-workflow-1111</link>
+   <guid isPermaLink="true">https://huggingface.co/blog/gradio-workflow-1111</guid>
+  </item>
+</channel>
+</rss>

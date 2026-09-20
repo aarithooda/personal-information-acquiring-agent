@@ -4,8 +4,9 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# Secrets: never commit API keys
-.env
+# Secrets: never commit API keys (covers .env, .env.txt, .env.local, ...)
+.env*
+!.env.example
 *.key
 
 # Local state: the database and generated briefings are personal data

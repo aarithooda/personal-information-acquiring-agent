@@ -1,0 +1,44 @@
+# Which sources PIA watches. Add a source = add a [[source]] block; no code changes for RSS.
+# Every source has a deterministic pre-filter (categories, points, stars, upvotes) so the
+# LLM only ever reads a manageable number of items.
+
+# --- Research papers ---------------------------------------------------------------
+[[source]]
+type = "arxiv"                       # small, high-signal categories only (volume is huge)
+categories = ["cs.AI", "cs.MA", "cs.SE"]
+max_results = 100
+
+[[source]]
+type = "hf_papers"                   # community-curated ML papers, filtered by upvotes
+min_upvotes = 10
+
+# --- Developer / tech news ---------------------------------------------------------
+[[source]]
+type = "hn"
+min_points = 100
+
+[[source]]
+type = "github"                      # new repos gaining stars quickly
+query = "llm OR agent OR ai"
+min_stars = 50
+
+# --- Curated blogs (low volume, so no pre-filter needed) ---------------------------
+[[source]]
+type = "rss"
+name = "quanta"                      # math / physics / CS
+url = "https://www.quantamagazine.org/feed/"
+
+[[source]]
+type = "rss"
+name = "deepmind"
+url = "https://deepmind.google/blog/rss.xml"
+
+[[source]]
+type = "rss"
+name = "openai"
+url = "https://openai.com/news/rss.xml"
+
+[[source]]
+type = "rss"
+name = "hf_blog"
+url = "https://huggingface.co/blog/feed.xml"
