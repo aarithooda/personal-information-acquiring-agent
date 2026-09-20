@@ -126,3 +126,33 @@ Observed live (2026-09-20, same 158 items): headlines 1 / 4 / 15 for 1 / 3 / 10 
   they are hard to summarize. Fetching article text is a V4 (deep dive) job.
 - In all three runs the editor filled every slot. The "choose fewer" path is covered by unit tests but
   not yet observed with the real model; watch for padding and tune the editor prompt if it persists.
+
+## Reliability pass (M6)
+
+- **No invented summaries.** Items with no text (whitespace counts as none) get an empty summary
+  regardless of what the model said; the prompt also tells it to return "". The briefing shows such
+  extras as a bare link. Measured live: 0/32 title-only items kept a summary. PROMPT_VERSION -> `stage1-v2`.
+- **Error taxonomy:** `LLMUnavailable` (no answer: outage, 429, bad key; never the item's fault) vs
+  `LLMBadOutput` (unusable answer: cut off, not JSON, no usable entries; may be the item's fault).
+- **Poison items:** on `LLMBadOutput` a batch is split in half recursively, isolating a culprit in
+  ~log2(batch) extra calls instead of starving every batch behind it. Unavailable errors never count
+  against items. Items get `triage_attempts` (schema v2); at 3 failed attempts they become `failed`
+  (excluded from briefings, counted in `pia status`).
+- **Schema migration v2** (`ALTER TABLE ... ADD COLUMN`) verified on a copy of the real v1 database.
+- **Prompt changes do not strand work:** `enriched_items` uses each item's latest enrichment whatever
+  its `prompt_version`.
+- **Bug found by fault injection:** a source with no successful fetch yet looked back from *now*, so a
+  source that was down at first launch permanently lost what it had published meanwhile. First-run
+  lookback is now anchored to the source's first *attempt* (still capped by MAX_LOOKBACK).
+- **Fault-injection tests** (`tests/test_resilience.py`): random source outages, LLM outages, garbage
+  output and process crashes across 25 seeds (plus 400 more run once, all passed), and a sweep that kills
+  the process at every LLM call. After every run: status and briefing links agree, no triage result is
+  lost or orphaned, briefing count and checkpoint match what was committed; after a healthy run nothing is
+  stuck and every source item is in the database.
+
+Considered and not done: proactive rate-limit pacing from `x-ratelimit-*` headers (reactive retry
+worked; revisit if daily runs feel slow).
+
+Finding: **80% of items are title-only** (mostly Hacker News, which gives a title and a link). Triage and
+the editor therefore judge most items on the title alone. Fetching and extracting linked article text is
+the highest-value quality improvement available.

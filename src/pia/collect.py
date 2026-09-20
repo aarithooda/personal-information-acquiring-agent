@@ -13,7 +13,7 @@ import httpx
 from pia.db import store_items
 from pia.http import SourceError
 from pia.sources.base import Source
-from pia.state import get_cursor, record_fetch_run
+from pia.state import get_cursor, get_first_attempt, record_fetch_run
 
 log = logging.getLogger(__name__)
 
@@ -48,7 +48,10 @@ def collect(
         # Start slightly BEFORE the cursor: sources index items late (an arXiv paper can
         # appear hours after its submit time). Re-fetched items are absorbed by dedup, so
         # overlap costs nothing and prevents gaps.
-        since = cursor - overlap if cursor else now - first_run_lookback
+        # No successful fetch yet: look back from the FIRST ATTEMPT (not from now), so a source
+        # that was down when the app was first opened still catches up on what it missed.
+        anchor = get_first_attempt(conn, source.name) or now
+        since = cursor - overlap if cursor else anchor - first_run_lookback
         since = max(since, now - max_lookback)
 
         try:

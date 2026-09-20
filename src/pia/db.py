@@ -68,6 +68,11 @@ MIGRATIONS = [
         item_count    INTEGER NOT NULL DEFAULT 0
     );
     """,
+    # v2: how many times triage has failed to produce a result for this item, so an item that
+    # the model can never handle is eventually given up on instead of retried forever.
+    """
+    ALTER TABLE items ADD COLUMN triage_attempts INTEGER NOT NULL DEFAULT 0;
+    """,
 ]
 
 

@@ -42,7 +42,7 @@ def test_enrich_runs_stage_one_and_shows_what_the_model_decided(tmp_path, monkey
 
     db = tmp_path / "pia.db"
     conn = connect(db)
-    store_items(conn, [make_item("hn", 1, T0)], now=T0)
+    store_items(conn, [make_item("hn", 1, T0, content="Details.")], now=T0)
     conn.close()
 
     monkeypatch.setattr(pia.cli, "make_llm", lambda client: FakeLLM(batch_response(entry(0, "ai", 4, "A big model."))))
@@ -99,6 +99,18 @@ def test_status_on_a_fresh_database(tmp_path):
     result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "status"])
     assert result.exit_code == 0
     assert "Last checked: never" in result.output
+
+
+def test_status_counts_items_the_system_gave_up_on(tmp_path):
+    db = tmp_path / "pia.db"
+    conn = connect(db)
+    run_briefing(conn, None, [FakeSource("a", [make_item("a", 1, T0), make_item("a", 2, T0)])], now=T0)
+    conn.execute("UPDATE items SET status = 'failed', briefing_id = NULL WHERE id = 1")
+    conn.commit()
+    conn.close()
+    result = runner.invoke(app, ["--db", str(db), "status"])
+    assert "Could not be processed (given up on): 1" in result.output
+    assert "Not yet briefed: 0" in result.output  # given-up items are not "waiting" for a briefing
 
 
 def test_status_reports_checkpoint_pending_items_and_source_health(tmp_path):

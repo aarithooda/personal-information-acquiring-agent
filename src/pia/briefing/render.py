@@ -74,7 +74,11 @@ def render_briefing(
         rows = [row for row in extras if row["category"] == category]
         if rows:
             lines += [f"## {heading}", ""]
-            lines += [f"- [{row['title']}]({row['url']}): {row['summary']}" for row in rows]
+            # An empty summary means the item had no text to summarize: show the link, invent nothing.
+            lines += [
+                f"- [{row['title']}]({row['url']})" + (f": {row['summary']}" if row["summary"] else "")
+                for row in rows
+            ]
             lines.append("")
 
     hidden = triaged - len(headlines) - len(extras)

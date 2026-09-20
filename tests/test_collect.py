@@ -74,6 +74,25 @@ def test_a_failed_source_catches_up_from_its_last_good_cursor(conn):
     assert source.calls[-1] == (T0 - HOUR, T0 + 2 * DAY)  # window still reaches back to T0
 
 
+def test_a_source_that_failed_on_its_first_ever_run_still_looks_back_from_that_first_attempt(conn):
+    """Found by the fault-injection test: without a cursor, a late first success used to look back
+    only from *its own* time, silently losing everything published while the source was down."""
+    source = FakeSource("a", error=SourceError("down"))
+    collect(conn, None, [source], now=T0, first_run_lookback=3 * DAY)
+    source.error = None
+    collect(conn, None, [source], now=T0 + 5 * DAY, first_run_lookback=3 * DAY)
+    assert source.calls[-1] == (T0 - 3 * DAY, T0 + 5 * DAY)
+
+
+def test_the_first_attempt_anchor_is_still_capped_by_max_lookback(conn):
+    source = FakeSource("a", error=SourceError("down"))
+    collect(conn, None, [source], now=T0)
+    source.error = None
+    late = T0 + 40 * DAY
+    collect(conn, None, [source], now=late, max_lookback=14 * DAY)
+    assert source.calls[-1][0] == late - 14 * DAY
+
+
 def test_an_unexpected_adapter_bug_is_contained(conn):
     buggy = FakeSource("buggy", error=RuntimeError("adapter bug"))
     good = FakeSource("good", [make_item("good", 1, T0 - HOUR)])

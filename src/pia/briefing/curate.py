@@ -17,7 +17,7 @@ from pia.collect import SourceResult
 from pia.llm.client import LLM, LLMError
 from pia.llm.enrich import enrich_pending
 from pia.llm.headlines import Headline, select_headlines
-from pia.llm.prompts import PROMPT_VERSION, STAGE2_MODEL
+from pia.llm.prompts import STAGE2_MODEL
 from pia.state import enriched_items, items_needing_enrichment
 
 log = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ def make_curator(llm: LLM, *, editor_model: str = STAGE2_MODEL) -> Prepare:
         results: list[SourceResult],
     ) -> BriefingContent:
         enrich_pending(conn, llm, now)
-        triaged = enriched_items(conn, PROMPT_VERSION)
+        triaged = enriched_items(conn)
         awaiting = len(items_needing_enrichment(conn))
         if not triaged and awaiting:
             raise EnrichmentFailed(f"{awaiting} new items could not be triaged (is the LLM reachable?)")

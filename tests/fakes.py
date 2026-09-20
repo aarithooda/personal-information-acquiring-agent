@@ -42,12 +42,13 @@ class SmartLLM:
     triage_ok_calls: number of triage calls that succeed before every later one fails
     """
 
-    def __init__(self, scores=None, editor_take=None, editor_error=None, triage_error=None, triage_ok_calls=None):
+    def __init__(self, scores=None, editor_take=None, editor_error=None, triage_error=None, triage_ok_calls=None, poison_titles=()):
         self.scores = scores or {}
         self.editor_take = editor_take
         self.editor_error = editor_error
         self.triage_error = triage_error
         self.triage_ok_calls = triage_ok_calls
+        self.poison_titles = set(poison_titles)
         self.calls: list[dict] = []
 
     def complete_json(self, **kwargs) -> dict:
@@ -60,6 +61,10 @@ class SmartLLM:
             n_triage_calls = sum(c["schema_name"] == "triage_results" for c in self.calls)
             if self.triage_error and (self.triage_ok_calls is None or n_triage_calls > self.triage_ok_calls):
                 raise self.triage_error
+            if self.poison_titles & {item["title"] for item in payload}:
+                from pia.llm.client import LLMBadOutput
+
+                raise LLMBadOutput("model output was cut off")
             return {
                 "results": [
                     {

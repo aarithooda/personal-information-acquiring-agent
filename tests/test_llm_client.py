@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from pia.llm.client import GroqClient, LLMError
+from pia.llm.client import GroqClient, LLMBadOutput, LLMError, LLMUnavailable
 
 SCHEMA = {
     "type": "object",
@@ -79,15 +79,15 @@ def test_omits_reasoning_effort_when_not_requested():
         httpx.Response(200, text="<html>gateway error</html>"),
     ],
 )
-def test_bad_completions_become_llm_errors(response):
+def test_unusable_replies_are_bad_output_errors(response):
     client, _ = client_for(lambda r: response)
-    with pytest.raises(LLMError):
+    with pytest.raises(LLMBadOutput):
         call(client)
 
 
-def test_http_failures_become_llm_errors_and_never_leak_the_key():
+def test_http_failures_are_unavailable_errors_and_never_leak_the_key():
     client, _ = client_for(lambda r: httpx.Response(401, json={"error": "invalid key"}))
-    with pytest.raises(LLMError) as excinfo:
+    with pytest.raises(LLMUnavailable) as excinfo:
         call(client)
     assert "gsk_TESTKEY" not in str(excinfo.value)
 
@@ -97,3 +97,7 @@ def test_rate_limits_are_retried_then_succeed():
     client, seen = client_for(lambda r: responses.pop(0))
     assert call(client) == {"answer": "ok"}
     assert len(seen) == 2
+
+
+def test_both_failure_kinds_are_llm_errors_so_existing_handlers_still_catch_them():
+    assert issubclass(LLMUnavailable, LLMError) and issubclass(LLMBadOutput, LLMError)

@@ -33,6 +33,13 @@ def get_cursor(conn: sqlite3.Connection, source: str) -> datetime | None:
     return _parse(row[0])
 
 
+def get_first_attempt(conn: sqlite3.Connection, source: str) -> datetime | None:
+    """When we first tried this source, successful or not. Anchors the first-run lookback so a
+    source that was down at first still catches up on what it missed."""
+    row = conn.execute("SELECT MIN(started_at) FROM fetch_runs WHERE source = ?", (source,)).fetchone()
+    return _parse(row[0])
+
+
 def record_fetch_run(
     conn: sqlite3.Connection,
     source: str,
@@ -72,7 +79,7 @@ def pending_items(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     last week that we only discovered today is still new *to the user*.
     """
     return conn.execute(
-        """SELECT * FROM items WHERE briefing_id IS NULL
+        """SELECT * FROM items WHERE briefing_id IS NULL AND status != 'failed'
            ORDER BY COALESCE(published_at, discovered_at) DESC, id DESC"""
     ).fetchall()
 
@@ -88,15 +95,34 @@ def items_needing_enrichment(conn: sqlite3.Connection, limit: int | None = None)
     return conn.execute(query, params).fetchall()
 
 
-def enriched_items(conn: sqlite3.Connection, prompt_version: str) -> list[sqlite3.Row]:
-    """Triaged items not yet shown to the user, most important first, with the triage attached."""
+def enriched_items(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Triaged items not yet shown to the user, most important first, with the triage attached.
+
+    An item may have been triaged more than once (e.g. after a prompt change); its most recent
+    enrichment wins, so changing PROMPT_VERSION never strands items triaged under the old one.
+    """
     return conn.execute(
         """SELECT i.*, e.category, e.importance, e.summary
-           FROM items i JOIN enrichments e ON e.item_id = i.id AND e.prompt_version = ?
+           FROM items i
+           JOIN enrichments e ON e.item_id = i.id
+            AND e.rowid = (SELECT MAX(rowid) FROM enrichments WHERE item_id = i.id)
            WHERE i.status = 'enriched' AND i.briefing_id IS NULL
-           ORDER BY e.importance DESC, COALESCE(i.published_at, i.discovered_at) DESC""",
-        (prompt_version,),
+           ORDER BY e.importance DESC, COALESCE(i.published_at, i.discovered_at) DESC"""
     ).fetchall()
+
+
+def record_triage_failures(conn: sqlite3.Connection, item_ids: list[int], max_attempts: int) -> int:
+    """Count a failed triage attempt against each item; give up on it (status 'failed') at
+    `max_attempts`. Returns how many items were newly given up on."""
+    gave_up = 0
+    with conn:
+        for item_id in item_ids:
+            conn.execute("UPDATE items SET triage_attempts = triage_attempts + 1 WHERE id = ?", (item_id,))
+            gave_up += conn.execute(
+                "UPDATE items SET status = 'failed' WHERE id = ? AND status = 'discovered' AND triage_attempts >= ?",
+                (item_id, max_attempts),
+            ).rowcount
+    return gave_up
 
 
 def save_enrichments(

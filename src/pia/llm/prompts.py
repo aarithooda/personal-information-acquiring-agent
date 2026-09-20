@@ -7,7 +7,7 @@ import json
 import sqlite3
 
 STAGE1_MODEL = "openai/gpt-oss-20b"  # cheap and fast; supports strict JSON schemas on Groq
-PROMPT_VERSION = "stage1-v1"
+PROMPT_VERSION = "stage1-v2"  # v2: no invented summaries for items without text
 
 CATEGORIES = ("ai", "software", "research", "other")
 CONTENT_CHARS = 500  # per-item text budget; titles + a snippet are enough to classify
@@ -32,6 +32,7 @@ For each item return:
   1 = noise or irrelevant
   Be conservative. Most items are 1 to 3. Use 'other' with importance 1 for irrelevant items.
 - summary: one plain sentence (at most 30 words) saying what the item actually is. No hype.
+  If an item has no text (empty "text" field), only its title is known: return an empty string "" for the summary instead of guessing what the item says.
 
 Popularity signals (points, upvotes, stars, appearing on several sources) are evidence of \
 importance, not proof. Judge the substance.

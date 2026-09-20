@@ -45,6 +45,29 @@ def test_connect_applies_migrations_once(tmp_path):
     second.close()
 
 
+def test_upgrading_a_released_v1_database_keeps_its_data(tmp_path):
+    """Your real data/pia.db was created at schema v1; new code must upgrade it in place."""
+    import sqlite3
+
+    from pia.db import MIGRATIONS
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(f"BEGIN;\n{MIGRATIONS[0]}\nPRAGMA user_version = 1;\nCOMMIT;")
+    old.execute(
+        "INSERT INTO items (source, external_id, canonical_url, url, title, discovered_at, status) "
+        "VALUES ('hn', '1', 'https://x.test/1', 'https://x.test/1', 'Old item', '2026-09-20T00:00:00+00:00', 'briefed')"
+    )
+    old.commit()
+    old.close()
+
+    upgraded = connect(path)
+    assert upgraded.execute("PRAGMA user_version").fetchone()[0] == len(MIGRATIONS) >= 2
+    row = upgraded.execute("SELECT title, status, triage_attempts FROM items").fetchone()
+    assert (row["title"], row["status"], row["triage_attempts"]) == ("Old item", "briefed", 0)
+    upgraded.close()
+
+
 def test_connect_creates_missing_parent_directories(tmp_path):
     path = tmp_path / "does" / "not" / "exist" / "pia.db"
     connect(path).close()

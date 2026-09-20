@@ -24,6 +24,16 @@ class LLMError(Exception):
     """The model call failed or returned something unusable. Safe to retry or skip."""
 
 
+class LLMUnavailable(LLMError):
+    """We could not get an answer: network down, rate limited, server error, bad key.
+    This says nothing about the input, so it is never held against an item."""
+
+
+class LLMBadOutput(LLMError):
+    """We got an answer we cannot use: cut off, not JSON, wrong shape, or empty.
+    This MAY be caused by the input, so callers can split a batch to find the culprit."""
+
+
 class LLM(Protocol):
     def complete_json(
         self,
@@ -93,7 +103,7 @@ class GroqClient:
                 sleep=self._sleep,
             )
         except SourceError as exc:
-            raise LLMError(f"Groq request failed: {exc}") from exc
+            raise LLMUnavailable(f"Groq request failed: {exc}") from exc
         return self._extract_json(response)
 
     @staticmethod
@@ -103,16 +113,16 @@ class GroqClient:
             content = choice["message"]["content"]
             finish_reason = choice.get("finish_reason")
         except (ValueError, KeyError, IndexError, TypeError) as exc:
-            raise LLMError(f"unexpected response shape from Groq: {exc!r}") from exc
+            raise LLMBadOutput(f"unexpected response shape from Groq: {exc!r}") from exc
 
         if finish_reason == "length":
-            raise LLMError("model output was cut off (hit the token limit)")
+            raise LLMBadOutput("model output was cut off (hit the token limit)")
         if not content or not content.strip():
-            raise LLMError("model returned empty content")
+            raise LLMBadOutput("model returned empty content")
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise LLMError(f"model returned invalid JSON: {exc}") from exc
+            raise LLMBadOutput(f"model returned invalid JSON: {exc}") from exc
         if not isinstance(data, dict):
-            raise LLMError("model returned JSON that is not an object")
+            raise LLMBadOutput("model returned JSON that is not an object")
         return data

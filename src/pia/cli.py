@@ -18,7 +18,6 @@ from pia.db import connect
 from pia.http import USER_AGENT
 from pia.llm.client import LLM, GroqClient
 from pia.llm.enrich import enrich_pending
-from pia.llm.prompts import PROMPT_VERSION
 from pia.pipeline import AllSourcesFailed, run_briefing
 from pia.sources.registry import load_sources
 from pia.state import enriched_items, get_checkpoint, last_fetch_runs, pending_items
@@ -114,7 +113,7 @@ def enrich(
 
     typer.echo(f"Enriched {report.enriched}; {report.remaining} still pending"
                + (" (stopped early after repeated failures)" if report.stopped_early else ""))
-    for row in enriched_items(conn, PROMPT_VERSION):
+    for row in enriched_items(conn):
         typer.echo(f"  {row['importance']} {row['category']:<9} {row['summary']}  [{row['source']}: {row['title'][:60]}]")
 
 
@@ -125,6 +124,8 @@ def status(ctx: typer.Context) -> None:
     checkpoint = get_checkpoint(conn)
     typer.echo(f"Last checked: {checkpoint:%Y-%m-%d %H:%M UTC}" if checkpoint else "Last checked: never")
     typer.echo(f"Not yet briefed: {len(pending_items(conn))}")
+    failed = conn.execute("SELECT COUNT(*) FROM items WHERE status = 'failed'").fetchone()[0]
+    typer.echo(f"Could not be processed (given up on): {failed}")
     typer.echo("Sources:")
     for run in last_fetch_runs(conn):
         detail = f"ok, {run['item_count']} items" if run["status"] == "ok" else f"FAILED: {run['error']}"

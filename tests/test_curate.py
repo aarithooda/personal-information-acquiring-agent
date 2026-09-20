@@ -155,3 +155,20 @@ def test_a_partially_failed_triage_still_briefs_and_leaves_the_rest_for_next_tim
     later = brief(conn, source, SmartLLM(), T0 + HOUR)  # the leftovers are picked up next run
     assert statuses(conn).get("discovered", 0) == 0
     assert len(later.items) > 0
+
+
+def test_title_only_extras_show_just_the_link_never_an_invented_description(conn):
+    source = FakeSource(
+        "a",
+        [
+            make_item("a", 0, T0 - HOUR),  # title only
+            make_item("a", 1, T0 - HOUR),  # title only
+            make_item("a", 2, T0 - HOUR, content="Real article text."),
+            make_item("a", 3, T0 - HOUR, content="More real text."),
+        ],
+    )
+    scores = {"a item 3": ("ai", 5), "a item 2": ("ai", 4), "a item 1": ("ai", 3), "a item 0": ("ai", 3)}
+    md = brief(conn, source, SmartLLM(scores=scores, editor_take=1), T0).markdown
+    assert "- [a item 0](https://example.com/a/0)\n" in md  # no trailing ': ...'
+    assert "- [a item 1](https://example.com/a/1)\n" in md
+    assert "- [a item 2](https://example.com/a/2): Summary of a item 2." in md
