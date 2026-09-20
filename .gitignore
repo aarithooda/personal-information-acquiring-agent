@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Secrets: never commit API keys
+.env
+*.key
+
+# Local state: the database and generated briefings are personal data
+data/*.db
+data/*.db-*
+briefings/
