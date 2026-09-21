@@ -19,3 +19,6 @@ briefings/
 
 # Personal interest profile (describes the user). config/interests.example.toml is the committed template.
 config/interests.toml
+
+# Benchmark: the item snapshot, your labels and the arm results describe your reading habits. Code and docs are committed.
+benchmarks/data/

@@ -390,3 +390,32 @@ importance 5 is never produced (ranking uses the continuous relevance, so this o
    model, is doing most of the work.
 5. **Profile size.** ~4k tokens per request against ~100-token items; an ablation with a shorter profile is cheap.
 6. Extras are now bare links (Jev writes no summaries); the editor only writes explanations for headlines.
+
+## Benchmark: labelled evaluation of Stage 1 (tooling only; `benchmarks/`)
+
+Requested 2026-09-21, before any change to the ranking formula. Goal: measure the current Jev Stage 1 and the current LLM
+Stage 1 against **human labels** on the frozen 186-item dataset, so later changes (a discovery lane, a title-only fix, new
+weights) are judged on evidence. **No production code changed**: the benchmark lives in `benchmarks/` and imports `pia`; the
+only edits outside it are `.gitignore` (personal data), and `pyproject.toml` (`pythonpath` gains `.` so tests can import it).
+Full explanation, metric glossary and limits: [benchmarks/README.md](../benchmarks/README.md).
+
+| # | Decision | Alternatives | Why / trade-off | Concept |
+|---|---|---|---|---|
+| B1 | Ground truth = the reader's own SHOW / MAYBE / SKIP labels; existing "shown" flags and every model score are never used as truth | Use briefing decisions or favourites | Shown items were chosen by the system under test (circular), and unshown items never had a chance to be wanted (selection bias) | Independent ground truth |
+| B2 | Freeze the items in `items.json` (facts only, content-hashed); the labelling module imports nothing that can read model output (tested) | Label from the live database | A fixed set makes numbers comparable over time; blindness by construction, not by promise | Blinding |
+| B3 | Seeded random queue; ~40 items repeated far apart; append-only labels, latest wins | Database order; overwrite a file | Random order spreads fatigue and makes any labelled prefix a random sample (so partial analysis is fair, if noisy); repeats measure the labeller's own consistency, the ceiling for any ranker | Test-retest reliability |
+| B4 | An **arm** is a file of RAW Stage 1 output; scoring re-runs PIA's own `enriched_items` + `rank_items`; `rescore` re-derives Jev relevance from stored answers with no API calls | Re-implement the ranking; store only final scores | Measures what PIA really does and lets a formula change be re-evaluated for free (J2 again). The curator's inline filter is pinned by a contract test that runs the real `make_curator` | Raw vs derived; contract tests |
+| B5 | Metrics at K = 4/10/16/32 (the editor's shortlist sizes for 1/3/5/10 days away) plus AP, AUC, nDCG, Spearman; strict (SHOW) and lenient (SHOW+MAYBE); `capture@K` = hits / min(K, #SHOW) | One headline number | Recall@K bounds what the briefing can contain (Stage 2 cannot resurrect an item Stage 1 dropped); capture removes the cap that a small SHOW set puts on recall and precision | Recall vs precision; ceilings |
+| B6 | 95% bootstrap intervals over items; arms compared on the SAME resamples (paired) | Point estimates | With ~25-40 SHOW items a proportion has a +-0.15-0.20 interval; a bare number would overstate what 186 items show | Uncertainty; paired comparison |
+| B7 | Each arm reported twice: production ranking, and model score alone | Production only | Separates what the model contributes from what popularity and cross-source boost add | Ablation |
+| B8 | Partial analyses are labelled PRELIMINARY and withhold every item-level list; `arm` and `snapshot` print counts only | Show everything | Naming items next to model scores mid-labelling would contaminate the labels still to be made | Blinding |
+| B9 | Every labelled item gets a `fold` (0-4, from its URL hash); tuning must be cross-validated or use fresh labels | Tune and test on all 186 | Fitting ~8 weights to 186 labels and reporting on the same 186 flatters the result | Overfitting |
+
+Not measured: Stage 2 (the editor's picks and prose), calibration of `relevance`, any other reader or period, and the "profile
+matters more than the model" hypothesis (needs a third arm: LLM + the same profile). Status when written: tooling complete and
+tested; labelling not yet done (waiting on the reader), so **no result is claimed**.
+
+Observed while freezing the baselines (real APIs): Jev returned HTTP 503 for every request on 2026-09-21, so the run stopped
+after the circuit breaker tripped and, by design, **saved nothing** (0 of 186 scored) instead of a misleading partial arm;
+finished items are kept in a scratch database and a re-run resumes without paying twice. The LLM arm met Groq's usual 429
+rate limits (absorbed by the retry layer) and at least one HTTP 400 on a batch (that batch's items stay pending and are retried).

@@ -252,6 +252,8 @@ is tested with Node when it is installed.
   the first real run: title-only items (Hacker News) score systematically low because there is little to judge,
   and the shortlist is top-K by score, so a run can be all AI papers and no mathematics even though the profile asks
   for discovery. See docs/design.md, "Jev at Stage 1", for the data and the options.
+- **Stage 1 quality is not yet measured against human judgment.** A labelled benchmark (blind labelling tool, baseline arms,
+  metrics, false-negative analysis) is set up in [benchmarks/README.md](benchmarks/README.md); the labelling is the reader's part.
 - arXiv is fetched newest-first and capped, so it is a sample, not a complete feed.
 - The LLM editor tends to fill every headline slot; watch for padding.
 - The web UI cannot start a check itself (deliberately; see docs/design.md, D8) and reads old briefings by parsing their saved text.
