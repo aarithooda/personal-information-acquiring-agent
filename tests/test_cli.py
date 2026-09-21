@@ -220,3 +220,48 @@ def test_status_does_not_upgrade_an_old_database(tmp_path):
     result = runner.invoke(app, ["--db", str(path), "status"])
     assert result.exit_code == 0
     assert _digest(path) == before
+
+
+# ---------- doctor ----------
+
+
+def _patch_checks(monkeypatch, *checks):
+    import pia.cli
+    from pia.doctor import Check
+
+    seen = {}
+
+    def fake_run_checks(**kwargs):
+        seen.update(kwargs)
+        return [Check(*c) for c in checks]
+
+    monkeypatch.setattr(pia.cli, "run_checks", fake_run_checks)
+    return seen
+
+
+def test_doctor_all_good_exits_zero(tmp_path, monkeypatch):
+    _patch_checks(monkeypatch, ("Python", "ok", "3.11.7"), ("Database", "ok", "schema v2"))
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor"])
+    assert result.exit_code == 0
+    assert "[ ok ] Python" in result.output and "All good" in result.output
+
+
+def test_doctor_warnings_do_not_fail(tmp_path, monkeypatch):
+    _patch_checks(monkeypatch, ("Database", "warn", "will be upgraded"))
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor"])
+    assert result.exit_code == 0 and "[warn] Database" in result.output
+
+
+def test_doctor_failures_exit_nonzero_and_say_how_many(tmp_path, monkeypatch):
+    _patch_checks(monkeypatch, ("API key", "fail", "not found"), ("Groq API", "fail", "skipped"), ("Python", "ok", "x"))
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor"])
+    assert result.exit_code == 1
+    assert "[FAIL] API key" in result.output and "2 problems" in result.output
+
+
+def test_doctor_is_offline_unless_asked(tmp_path, monkeypatch):
+    seen = _patch_checks(monkeypatch, ("Python", "ok", "x"))
+    runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor"])
+    assert seen["online"] is False
+    runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor", "--online"])
+    assert seen["online"] is True and seen["client"] is not None

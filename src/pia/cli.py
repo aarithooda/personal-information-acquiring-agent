@@ -15,6 +15,7 @@ from pia.briefing.curate import EnrichmentFailed, make_curator
 from pia.collect import collect
 from pia.config import DEFAULT_DB, DEFAULT_SOURCES, ConfigError, get_groq_api_key
 from pia.db import connect
+from pia.doctor import run_checks
 from pia.history import DatabaseMissing, connect_readonly, default_briefing_id, get_briefing, list_briefings
 from pia.http import USER_AGENT
 from pia.llm.client import LLM, GroqClient
@@ -179,6 +180,29 @@ def show(
         return
     typer.echo(f"Briefing #{briefing['id']}, saved {briefing['created_at'][:16]} UTC\n")
     Console().print(Markdown(briefing["rendered_md"]))
+
+
+@app.command()
+def doctor(
+    ctx: typer.Context,
+    online: bool = typer.Option(False, "--online", help="Also test the network: each source and your Groq key."),
+) -> None:
+    """Check that everything is set up correctly. Changes nothing; never prints your API key."""
+    kwargs = dict(db_path=ctx.obj.db, config_path=ctx.obj.config, online=online)
+    if online:
+        with _http_client() as client:
+            checks = run_checks(**kwargs, client=client)
+    else:
+        checks = run_checks(**kwargs, client=None)
+
+    labels = {"ok": "[ ok ]", "warn": "[warn]", "fail": "[FAIL]"}
+    for c in checks:
+        typer.echo(f"{labels[c.status]} {c.name}: {c.detail}")
+    problems = sum(c.status == "fail" for c in checks)
+    if problems:
+        typer.echo(f"\n{problems} problem{'s' if problems != 1 else ''} found.")
+        raise typer.Exit(1)
+    typer.echo("\nAll good." + ("" if online else " (Add --online to also test the network.)"))
 
 
 if __name__ == "__main__":

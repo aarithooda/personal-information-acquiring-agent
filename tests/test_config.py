@@ -45,3 +45,13 @@ def test_an_empty_value_counts_as_missing_and_errors_do_not_echo_file_contents(t
     with pytest.raises(ConfigError) as excinfo:
         get_groq_api_key(root=tmp_path, environ={})
     assert "hunter2" not in str(excinfo.value)
+
+
+def test_find_reports_where_the_key_came_from_without_exposing_it(tmp_path):
+    from pia.config import find_groq_api_key
+
+    assert find_groq_api_key(root=tmp_path, environ={"GROQ_API_KEY": KEY}) == (KEY, "environment variable")
+    (tmp_path / ".env.txt").write_text(f"GROQ_API_KEY={KEY}\n")
+    assert find_groq_api_key(root=tmp_path, environ={}) == (KEY, ".env.txt")
+    (tmp_path / ".env").write_text(f"GROQ_API_KEY={KEY}\n")
+    assert find_groq_api_key(root=tmp_path, environ={})[1] == ".env"  # .env takes priority

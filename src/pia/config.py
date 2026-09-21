@@ -40,17 +40,22 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-def get_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str:
-    """The real environment wins; otherwise the first .env file that has a non-empty value."""
+def find_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> tuple[str, str]:
+    """Returns (key, where it came from). The real environment wins; otherwise the first
+    .env file that has a non-empty value."""
     if environ.get("GROQ_API_KEY"):
-        return environ["GROQ_API_KEY"]
+        return environ["GROQ_API_KEY"], "environment variable"
     for name in ENV_FILES:
         path = root / name
         if path.is_file():
             value = _parse_env_file(path).get("GROQ_API_KEY")
             if value:
-                return value
+                return value, name
     raise ConfigError(
         f"GROQ_API_KEY not found. Put a line 'GROQ_API_KEY=your_key' in {root / '.env'} "
         "(or set the environment variable)."
     )
+
+
+def get_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str:
+    return find_groq_api_key(root, environ)[0]
