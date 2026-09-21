@@ -135,7 +135,7 @@ the Python code has no Windows-specific dependencies apart from the optional `.b
 screen, but macOS and Linux are untested.
 
 ```bash
-git clone https://github.com/aarithooda/pia.git
+git clone https://github.com/aarithooda/personal-information-acquiring-agent.git pia
 cd pia
 python -m venv .venv
 # Windows:        .venv\Scripts\activate
