@@ -15,6 +15,7 @@ from pia.briefing.curate import EnrichmentFailed, make_curator
 from pia.collect import collect
 from pia.config import DEFAULT_DB, DEFAULT_SOURCES, ConfigError, get_groq_api_key
 from pia.db import connect
+from pia.history import DatabaseMissing, connect_readonly, default_briefing_id, get_briefing, list_briefings
 from pia.http import USER_AGENT
 from pia.llm.client import LLM, GroqClient
 from pia.llm.enrich import enrich_pending
@@ -119,8 +120,13 @@ def enrich(
 
 @app.command()
 def status(ctx: typer.Context) -> None:
-    """Show the checkpoint, unbriefed items and the health of each source."""
-    conn = connect(ctx.obj.db)
+    """Show the checkpoint, unbriefed items and the health of each source. Read-only."""
+    try:
+        conn = connect_readonly(ctx.obj.db)
+    except DatabaseMissing:
+        typer.echo("Last checked: never")
+        typer.echo("(no database yet; run `pia` to create it)")
+        return
     checkpoint = get_checkpoint(conn)
     typer.echo(f"Last checked: {checkpoint:%Y-%m-%d %H:%M UTC}" if checkpoint else "Last checked: never")
     typer.echo(f"Not yet briefed: {len(pending_items(conn))}")
@@ -130,6 +136,49 @@ def status(ctx: typer.Context) -> None:
     for run in last_fetch_runs(conn):
         detail = f"ok, {run['item_count']} items" if run["status"] == "ok" else f"FAILED: {run['error']}"
         typer.echo(f"  {run['source']:<10} {run['started_at'][:16]}  {detail}")
+
+
+@app.command()
+def history(ctx: typer.Context) -> None:
+    """List every past check, newest first. Read-only."""
+    try:
+        rows = list_briefings(connect_readonly(ctx.obj.db))
+    except DatabaseMissing:
+        rows = []
+    if not rows:
+        typer.echo("No briefings yet. Run `pia` to create the first one.")
+        return
+    for r in rows:
+        typer.echo(f"  #{r['id']:<3} {r['created_at'][:16]} UTC   showed {r['shown']:<3} skipped {r['skipped']}")
+    typer.echo("\nRead one with: pia show <number>")
+
+
+@app.command()
+def show(
+    ctx: typer.Context,
+    briefing_id: int = typer.Argument(None, help="Which briefing (see `pia history`). Default: the latest one that had content."),
+    raw: bool = typer.Option(False, "--raw", help="Print the plain markdown only (for piping or saving)."),
+) -> None:
+    """Re-read a past briefing exactly as it was saved. Read-only: fetches nothing, changes nothing."""
+    try:
+        conn = connect_readonly(ctx.obj.db)
+    except DatabaseMissing:
+        typer.echo("No briefings yet. Run `pia` to create the first one.", err=True)
+        raise typer.Exit(1)
+    if briefing_id is None:
+        briefing_id = default_briefing_id(conn)
+        if briefing_id is None:
+            typer.echo("No briefings yet. Run `pia` to create the first one.", err=True)
+            raise typer.Exit(1)
+    briefing = get_briefing(conn, briefing_id)
+    if briefing is None:
+        typer.echo(f"No briefing #{briefing_id}. Run `pia history` to see what exists.", err=True)
+        raise typer.Exit(1)
+    if raw:
+        typer.echo(briefing["rendered_md"])
+        return
+    typer.echo(f"Briefing #{briefing['id']}, saved {briefing['created_at'][:16]} UTC\n")
+    Console().print(Markdown(briefing["rendered_md"]))
 
 
 if __name__ == "__main__":

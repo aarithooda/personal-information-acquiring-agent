@@ -127,3 +127,96 @@ def test_status_reports_checkpoint_pending_items_and_source_health(tmp_path):
     assert "Not yet briefed: 0" in result.output
     assert "good" in result.output and "ok" in result.output
     assert "bad" in result.output and "service down" in result.output
+
+
+# ---------- read-only inspection commands: history / show / status ----------
+
+
+def _db_with_two_briefings(tmp_path):
+    """Briefing 1 shows two items; briefing 2 ('nothing new') is the newest but empty."""
+    from datetime import timedelta
+
+    db = tmp_path / "pia.db"
+    conn = connect(db)
+    source = FakeSource("a", [make_item("a", 1, T0), make_item("a", 2, T0)])
+    run_briefing(conn, None, [source], now=T0)
+    run_briefing(conn, None, [source], now=T0 + timedelta(days=1))
+    conn.close()
+    return db
+
+
+def _digest(path):
+    import hashlib
+
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_history_lists_every_check_newest_first(tmp_path):
+    db = _db_with_two_briefings(tmp_path)
+    result = runner.invoke(app, ["--db", str(db), "history"])
+    assert result.exit_code == 0
+    lines = [line for line in result.output.splitlines() if line.strip().startswith("#")]
+    assert lines[0].strip().startswith("#2") and "showed 0" in lines[0]
+    assert lines[1].strip().startswith("#1") and "showed 2" in lines[1]
+
+
+def test_show_defaults_to_the_latest_briefing_that_had_content(tmp_path):
+    db = _db_with_two_briefings(tmp_path)
+    result = runner.invoke(app, ["--db", str(db), "show", "--raw"])
+    assert result.exit_code == 0
+    assert "a item 1" in result.output and "0 new item(s)" not in result.output
+
+
+def test_show_can_pick_a_briefing_by_number(tmp_path):
+    db = _db_with_two_briefings(tmp_path)
+    result = runner.invoke(app, ["--db", str(db), "show", "2", "--raw"])
+    assert result.exit_code == 0 and "0 new item(s)" in result.output
+
+
+def test_show_without_raw_prints_a_header_naming_the_briefing(tmp_path):
+    db = _db_with_two_briefings(tmp_path)
+    result = runner.invoke(app, ["--db", str(db), "show"])
+    assert result.exit_code == 0 and "Briefing #1" in result.output
+
+
+def test_show_an_unknown_number_explains_how_to_find_the_right_one(tmp_path):
+    db = _db_with_two_briefings(tmp_path)
+    result = runner.invoke(app, ["--db", str(db), "show", "99"])
+    assert result.exit_code == 1 and "pia history" in result.output
+
+
+def test_inspection_commands_never_create_or_change_the_database(tmp_path):
+    missing = tmp_path / "nothing-here" / "pia.db"
+    for command in (["history"], ["show"], ["status"]):
+        runner.invoke(app, ["--db", str(missing), *command])
+        assert not missing.exists() and not missing.parent.exists(), command
+
+    db = _db_with_two_briefings(tmp_path)
+    before = _digest(db)
+    for command in (["history"], ["show"], ["show", "2"], ["status"]):
+        result = runner.invoke(app, ["--db", str(db), *command])
+        assert result.exit_code == 0, (command, result.output)
+    assert _digest(db) == before
+
+
+def test_history_and_show_explain_an_empty_installation_instead_of_crashing(tmp_path):
+    missing = str(tmp_path / "pia.db")
+    history = runner.invoke(app, ["--db", missing, "history"])
+    assert history.exit_code == 0 and "No briefings yet" in history.output
+    show = runner.invoke(app, ["--db", missing, "show"])
+    assert show.exit_code == 1 and "No briefings yet" in show.output
+
+
+def test_status_does_not_upgrade_an_old_database(tmp_path):
+    import sqlite3
+
+    from pia.db import MIGRATIONS
+
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.executescript(f"BEGIN;\n{MIGRATIONS[0]}\nPRAGMA user_version = 1;\nCOMMIT;")
+    old.close()
+    before = _digest(path)
+    result = runner.invoke(app, ["--db", str(path), "status"])
+    assert result.exit_code == 0
+    assert _digest(path) == before
