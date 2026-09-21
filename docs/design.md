@@ -303,3 +303,33 @@ the end with `git diff --stat` against the pre-UI commit.
 
 Plan: W1 migration + favorites data layer; W2 read API + briefing parser; W3 favorites API + security tests;
 W4 front end; W5 `pia web`, launcher, docs, browser verification.
+
+### Web UI: what was built and what checking it in a real browser found (W4-W5)
+
+Built as designed: `pia web` (127.0.0.1:8765, `--open`, refuses non-local hosts, friendly message if the
+`web` extra is missing), `run-pia-web.bat`, and a three-tab single page (New, Library, Favorites) over the API in
+`web/app.py`. The front end is `index.html` + `app.css` + `logic.js` (pure, Node-tested) + `app.js` (DOM).
+
+Verified in a real browser against a *copy* of the real database: briefing picker over all past briefings; headline
+cards with explanation and "why it matters"; star click -> `PUT` -> UI, tab counter, API count and the SQLite row all
+agree; favorites survive a full page reload; Library shows 16 items by default and 186 with the skipped toggle;
+"Load more", search and category filters combine; un-starring in Favorites removes the card and the row; no console errors.
+A deliberately hostile item (`<img onerror>`, `<script>`, a `javascript:` URL, an HTML summary) was displayed as inert
+text: nothing injected, no script ran, and the URL was not made clickable.
+
+**Bug found only by using it:** Library and Favorites shared one filter object, so a search made in Library silently
+applied to Favorites, which then said "No favorites yet" while hiding a real favorite. Fixes: filters are per tab; empty
+states distinguish "nothing exists" from "filters are hiding things" and offer "Clear filters".
+Lesson: an empty state is a claim about the data, and it must be true.
+
+**Structural change that followed:** the pure decisions (query building, empty-state wording, the http(s)-only link
+rule) moved to `logic.js` and are unit-tested with Node (`tests/test_web_logic.py`), because DOM code cannot be
+tested without a browser. Static rules (no `innerHTML`, no inline code, valid syntax, explicit PUT/DELETE) are tests too.
+
+**Test-suite change:** the "nothing leaves this machine" guard now allows loopback only, because asyncio's event loop
+(used by FastAPI's TestClient) opens an in-process loopback socket pair on Windows. The guard has its own test.
+
+**Process notes:** the favorite endpoints were written in the same file as the read endpoints before their tests; a
+mutation check (four deliberate breakages, all caught) was used to show the tests are real. Known limits: the UI
+depends on the renderer's layout (contract-tested, raw-text fallback), Library ordering within a briefing is by
+importance because headline rank is not stored, and there is no "Check now" (D8).

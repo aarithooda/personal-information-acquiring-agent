@@ -67,6 +67,7 @@ few minutes because Groq's free tier rate-limits the initial batch of items; lat
 | `pia doctor` | Check Python, API key, config and database (`--online` also tests each source and your key) | No |
 | `pia collect` | Fetch and store items only; no briefing, checkpoint unchanged | Stores items |
 | `pia enrich` | Run the LLM triage on stored items and print what it decided | Stores triage |
+| `pia web` | Start the local web UI: New, Library, Favorites (see below) | Only your favorites (and upgrades an old schema) |
 
 Options go before the command: `pia --db other.db status`, `pia -v` (show warnings and retries).
 The four read-only commands open the database in SQLite's read-only mode, so they can never alter it, create it,
@@ -74,6 +75,27 @@ or upgrade an old schema.
 
 Every check is recorded, including "nothing new" ones, so the newest entry in `pia history` is often an empty
 check. `pia show` skips those by default.
+
+## Web UI: New, Library, Favorites
+
+A small local web page over the same database. **Double-click `run-pia-web.bat`** (or run `pia web`) and your browser
+opens at `http://127.0.0.1:8765`.
+
+| Tab | What it shows |
+|---|---|
+| **New** | The latest briefing that had content, laid out as headline cards and one-line lists. A picker lets you open any past briefing |
+| **Library** | Everything you have been shown, with search and category/source filters. Tick "Include items the briefing skipped" to reach the rest of the history |
+| **Favorites** | Whatever you starred with the ☆ button, newest first. Stars are saved in the same SQLite file (`data/pia.db`), so they survive restarts |
+
+The web UI installs from an optional extra, once: `.venv\Scripts\python.exe -m pip install -e ".[web]"` (the `dev` extra
+already includes it).
+
+- **It does not fetch anything.** There is no "check now" button: run `run-pia.bat` (or `pia`), then refresh the page.
+- **It is local-only.** It listens on `127.0.0.1`, checks the `Host` header, sends no CORS headers and a strict
+  Content-Security-Policy, and `pia web` refuses non-local addresses. It shows your reading history.
+- **Reading is read-only.** Only the star buttons write, and only to the `favorites` table. Interactive API docs are at
+  `http://127.0.0.1:8765/docs`.
+- **Web text is shown as text, never as HTML**, so a hostile title cannot run code in the page.
 
 ## How it works
 
@@ -131,6 +153,7 @@ categories, minimum Hacker News points, or minimum GitHub stars.
 - **Web text is untrusted.** Titles and snippets are passed to the models as delimited data, the prompts forbid
   following instructions found in them, and the output schema only allows a category, a score and text. The models
   have no tools, so the worst a hostile item can do is mis-score itself.
+- **The web UI is local-only** (127.0.0.1) and never sends your data anywhere.
 - **No arbitrary page fetching.** PIA only calls the source APIs and feeds listed in `config/sources.toml`.
 
 ## Reliability
@@ -149,7 +172,8 @@ breaking sources and the LLM across many runs and checking database invariants a
 5. `llm/client.py`, `llm/prompts.py`, `llm/enrich.py`: structured output, untrusted input, batching, failure
 6. `briefing/rank.py`, `briefing/budget.py`, `llm/headlines.py`, `briefing/curate.py`: from scores to a briefing
 7. `history.py`, `doctor.py`, `cli.py`: read-only access and the command line
-8. `tests/`: `fakes.py` (a scriptable LLM), `test_pipeline.py` (your scenarios), `test_resilience.py` (fault injection)
+8. `web/`: `favorites.py` and `queries.py` (data), `briefing_view.py` (parsing saved briefings), `app.py` (the API), `static/` (the page)
+9. `tests/`: `fakes.py` (a scriptable LLM), `test_pipeline.py` (your scenarios), `test_resilience.py` (fault injection)
 
 | Concept | Where to see it |
 |---|---|
@@ -164,6 +188,13 @@ breaking sources and the LLM across many runs and checking database invariants a
 | Error taxonomy and batch bisection | `llm/client.py`, `llm/enrich.py` |
 | Read-only access | `history.py` |
 | Fault injection | `tests/test_resilience.py` |
+| API as a contract (typed responses) | `web/schemas.py`, `/docs` |
+| Idempotency in HTTP (`PUT`/`DELETE`, not a toggle) | `web/app.py`, `web/favorites.py` |
+| A read model, guarded by a contract test | `web/briefing_view.py`, `tests/test_briefing_view.py` |
+| Threat model of a local server (Host check, CSP, no CORS) | `web/app.py` |
+| Untrusted text and XSS (text nodes only) | `web/static/app.js` |
+| Pure logic split from the DOM so it can be tested | `web/static/logic.js`, `tests/test_web_logic.py` |
+| SQLite connections belong to one thread | `web/app.py` |
 
 ## Testing
 
@@ -171,8 +202,9 @@ breaking sources and the LLM across many runs and checking database invariants a
 .venv\Scripts\python.exe -m pytest
 ```
 
-No test touches the network or your real database. HTTP is replaced by a fake transport, the LLM by a scriptable
-fake, and time by an injected clock.
+No test reaches beyond your own machine (any outside connection fails the test) and none touches your real database.
+HTTP is replaced by a fake transport, the LLM by a scriptable fake, and time by an injected clock. The front-end logic
+is tested with Node when it is installed.
 
 ## Troubleshooting
 
@@ -183,6 +215,8 @@ fake, and time by an injected clock.
 | "GROQ_API_KEY not found" | The key must be in `.env` (or `.env.txt`) in the project folder |
 | First run is slow | Groq's free tier rate-limits; PIA waits and retries automatically |
 | "Nothing was recorded" | Triage or every source failed, so the checkpoint was deliberately not moved. Run `pia` again |
+| `pia web` says it needs extra packages | `.venv\Scripts\python.exe -m pip install -e ".[web]"` |
+| Web page is empty | Run `run-pia.bat` first to create a briefing, then refresh |
 | Emoji show as boxes | Use Windows Terminal; the old console font lacks them |
 
 ## Known limitations and what is next
@@ -192,6 +226,7 @@ fake, and time by an injected clock.
   constraints are in [docs/design.md](docs/design.md) under "Future consideration: article text".
 - arXiv is fetched newest-first and capped, so it is a sample, not a complete feed.
 - The LLM editor tends to fill every headline slot; watch for padding.
+- The web UI cannot start a check itself (deliberately; see docs/design.md, D8) and reads old briefings by parsing their saved text.
 - Manual runs only: there is no scheduler. Times are shown in UTC.
 
 Planned direction (not built): V2 learns your interests; V3 semantic search over what you have seen; V4 research

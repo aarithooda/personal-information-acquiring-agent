@@ -1,3 +1,4 @@
+import pytest
 from fakes import T0, FakeSource, make_item
 from typer.testing import CliRunner
 
@@ -265,3 +266,62 @@ def test_doctor_is_offline_unless_asked(tmp_path, monkeypatch):
     assert seen["online"] is False
     runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "doctor", "--online"])
     assert seen["online"] is True and seen["client"] is not None
+
+
+# ---------- web ----------
+
+
+class _FakeUvicorn:
+    def __init__(self):
+        self.calls = []
+
+    def run(self, app, **kwargs):
+        self.calls.append((app, kwargs))
+
+
+def _patch_web(monkeypatch):
+    import pia.cli
+    from pia.web.app import create_app
+
+    fake = _FakeUvicorn()
+    opened = []
+    monkeypatch.setattr(pia.cli, "_load_web", lambda: (fake, create_app))
+    monkeypatch.setattr(pia.cli, "_open_later", lambda url: opened.append(url))
+    return fake, opened
+
+
+def test_web_starts_the_server_locally_on_the_default_port_with_the_chosen_database(tmp_path, monkeypatch):
+    fake, opened = _patch_web(monkeypatch)
+    db = tmp_path / "pia.db"
+    result = runner.invoke(app, ["--db", str(db), "web"])
+    assert result.exit_code == 0
+    (served_app, kwargs), = fake.calls
+    assert kwargs["host"] == "127.0.0.1" and kwargs["port"] == 8765
+    assert served_app.title == "PIA" and db.exists()  # created/migrated for the chosen database
+    assert "http://127.0.0.1:8765" in result.output and opened == []
+
+
+def test_web_options_choose_the_port_and_can_open_the_browser(tmp_path, monkeypatch):
+    fake, opened = _patch_web(monkeypatch)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "web", "--port", "9100", "--open"])
+    assert result.exit_code == 0
+    assert fake.calls[0][1]["port"] == 9100 and opened == ["http://127.0.0.1:9100"]
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "192.168.1.20", "example.com"])
+def test_web_refuses_anything_but_a_local_address(tmp_path, monkeypatch, host):
+    fake, _ = _patch_web(monkeypatch)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "web", "--host", host])
+    assert result.exit_code == 1 and "local" in result.output.lower()
+    assert fake.calls == []
+
+
+def test_web_explains_how_to_install_the_extras_when_they_are_missing(tmp_path, monkeypatch):
+    import pia.cli
+
+    def missing():
+        raise ImportError("No module named 'uvicorn'")
+
+    monkeypatch.setattr(pia.cli, "_load_web", missing)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "web"])
+    assert result.exit_code == 1 and 'pip install -e ".[web]"' in result.output

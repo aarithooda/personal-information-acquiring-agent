@@ -1,2 +1,28 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>PIA</title></head><body><p>PIA</p></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PIA</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <!-- Scripts and styles are external files: the Content-Security-Policy forbids inline ones. -->
+  <script src="/static/logic.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>PIA</h1>
+      <span id="last-checked" class="muted"></span>
+    </div>
+    <nav id="tabs" aria-label="Sections">
+      <a href="#/new" data-tab="new">New</a>
+      <a href="#/library" data-tab="library">Library <span class="count" id="count-library"></span></a>
+      <a href="#/favorites" data-tab="favorites">Favorites <span class="count" id="count-favorites"></span></a>
+    </nav>
+  </header>
+  <div id="banner" class="banner error" role="alert" hidden></div>
+  <main id="view" tabindex="-1"></main>
+  <noscript><p class="banner error">PIA's web view needs JavaScript.</p></noscript>
+</body>
+</html>

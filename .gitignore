@@ -13,3 +13,6 @@ __pycache__/
 data/*.db
 data/*.db-*
 briefings/
+
+# Local tool configuration
+.claude/

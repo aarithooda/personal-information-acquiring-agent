@@ -2,6 +2,8 @@
 
 import logging
 import sys
+import threading
+import webbrowser
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -203,6 +205,51 @@ def doctor(
         typer.echo(f"\n{problems} problem{'s' if problems != 1 else ''} found.")
         raise typer.Exit(1)
     typer.echo("\nAll good." + ("" if online else " (Add --online to also test the network.)"))
+
+
+LOCAL_HOSTS = ("127.0.0.1", "localhost")
+
+
+def _load_web():
+    """Import the optional web dependencies only when `pia web` runs, so the core needs none of them."""
+    import uvicorn
+
+    from pia.web.app import create_app
+
+    return uvicorn, create_app
+
+
+def _open_later(url: str) -> None:
+    threading.Timer(1.0, webbrowser.open, [url]).start()  # give the server a moment to start
+
+
+@app.command()
+def web(
+    ctx: typer.Context,
+    host: str = typer.Option("127.0.0.1", help="Address to listen on. Local addresses only."),
+    port: int = typer.Option(8765, help="Port to listen on."),
+    open_browser: bool = typer.Option(False, "--open", help="Open the page in your browser."),
+) -> None:
+    """Start the local web UI: New, Library and Favorites. Press Ctrl+C to stop."""
+    if host not in LOCAL_HOSTS:
+        typer.echo(
+            f"Refusing to listen on {host!r}: the web UI is local-only, because it shows your personal "
+            "reading history. Use 127.0.0.1 or localhost.",
+            err=True,
+        )
+        raise typer.Exit(1)
+    try:
+        uvicorn, create_app = _load_web()
+    except ImportError:
+        typer.echo('The web UI needs extra packages. Install them with:  pip install -e ".[web]"', err=True)
+        raise typer.Exit(1)
+
+    web_app = create_app(ctx.obj.db)  # also upgrades the database schema if needed, like `pia` does
+    url = f"http://{host}:{port}"
+    typer.echo(f"PIA web UI: {url}   (Ctrl+C to stop)")
+    if open_browser:
+        _open_later(url)
+    uvicorn.run(web_app, host=host, port=port, log_level="warning")
 
 
 if __name__ == "__main__":
