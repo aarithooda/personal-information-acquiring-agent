@@ -145,7 +145,7 @@ def status(ctx: typer.Context) -> None:
 
 
 @app.command()
-def freeze(ctx: typer.Context, force: bool = typer.Option(False, "--force", help="Replace frozen labels (only if you mean to relabel).")) -> None:
+def freeze(ctx: typer.Context, force: bool = typer.Option(False, "--force", help="Replace frozen labels. After results have been seen this starts a NEW benchmark version (README, rule 7).")) -> None:
     """Turn your labels into the frozen yardstick. Needs every item labelled."""
     with friendly():
         shot = load_snapshot(ctx.obj / SNAPSHOT_FILE)

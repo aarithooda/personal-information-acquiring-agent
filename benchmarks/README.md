@@ -3,6 +3,8 @@
 A small, honest experiment: **how well does PIA's Stage 1 (Jev, or the older LLM triage) find the items its reader
 actually wants?** The reader labels 186 real items blind; the tooling scores each Stage 1 against those labels.
 
+Benchmark version: **v1**. Every report prints it. See rule 7 under *Decision rules* for what a new version means.
+
 Nothing under `src/pia` is changed by this folder. It reads production code, never modifies it, and never touches
 `data/pia.db` except to copy item text out of it read-only, once.
 
@@ -179,16 +181,52 @@ computes the exact bootstrap):
 - **Multiple comparisons.** The report shows many metrics and groups. If you go looking you will find something. Decide the
   primary metric *before* looking (below).
 
-## Decision rules (proposed. Edit before you start labelling, then commit this file so the rules predate the data)
+## Decision rules (benchmark v1)
+
+These rules were fixed before any label existed. The git commit that introduced this wording predates every label
+(`git log -p benchmarks/README.md` shows it). Rule 7 governs any later change.
+
+**Label mapping (a definition, not a preference).** Each label has a fixed grade, and each metric uses it in one fixed way:
+
+| Label | Grade | nDCG gain | AP |
+|---|---|---|---|
+| SHOW | 2 | 2 | relevant |
+| MAYBE | 1 | 1 | not relevant |
+| SKIP | 0 | 0 | not relevant |
+
+nDCG uses SHOW = 2, MAYBE = 1, SKIP = 0 as gains. AP treats SHOW as relevant and MAYBE and SKIP as non-relevant. The
+recall, precision and capture metrics also count SHOW only. The `*_lenient` variants (MAYBE counted as relevant) are
+supplementary and are never used for a decision.
 
 1. **Primary metrics:** capture@16 and nDCG@16 (the shortlist of a typical 5-day gap); AP as the whole-ranking check.
 2. **Jev vs the LLM baseline:** report the paired difference in AP and nDCG@16 with its 95% interval. If the interval includes 0 the
    honest statement is "cannot tell", not "equal".
 3. **Adopting a ranking change** (discovery lane, title-only fix, new weights): the paired nDCG@16 difference against the current
-   Jev arm has a 95% interval above 0, **and** title-only recall@16 does not get worse.
+   Jev arm has a 95% interval above 0, **and** the title-only guardrail holds:
+   `new title_only recall@16 >= current Jev title_only recall@16`.
+   Here `title_only` is the report's "title-only" group (items with no non-whitespace text), `recall@16` is the share of that
+   group's SHOW items inside the arm's production top 16, and "current Jev" is the frozen arm named `jev` in
+   `benchmarks/data/arms` (its profile hash and commit are recorded in the report). Equal passes; anything lower fails.
 4. **No tuning on the same labels you test on.** Every labelled item has a `fold` (0-4, from its URL hash). Fitting weights on all
    186 and reporting on the same 186 flatters the result. Tune on some folds and report on the rest, or collect fresh labels.
 5. **Look at misses before changing anything.** The missed-item list says *why* an item was missed; fix the cause, not the number.
+6. **What this benchmark is.** It is a development/evaluation benchmark: one reader, one snapshot of 186 items from about five
+   days, so it can rank candidate changes and catch regressions on this reader's data. It is not definitive evidence of
+   generalization to other readers, weeks or sources. The 5-fold rule in rule 4 only guards against overfitting these labels
+   (the folds come from the same 186 items), so a claim beyond "better on this benchmark" needs fresh labels.
+7. **No changes after seeing results.** Once `analyze` has been run on complete labels, the benchmark's methodology, labels and
+   decision rules must not be changed after seeing results. That covers the label definitions and mapping, the snapshot, the
+   queue, the frozen labels, the K values, the primary metrics, the guardrail, the group definitions, and these rules. Any
+   substantive change creates a new benchmark version: bump `BENCHMARK_VERSION` in `benchmarks/common.py`, add an entry
+   below, keep the old reports, and never compare numbers across versions. A tooling bug fix that alters any reported number
+   is substantive. Not substantive: prose and typo fixes, speed-ups that leave every number unchanged, scoring a new arm, and
+   extra analyses that are labelled exploratory and not used for a decision. (The same applies to relabelling:
+   `freeze --force` after results have been seen starts a new version.)
+
+### Version history
+
+- **v1** (2026-09-21): snapshot `1c20c65fe2ca` (186 items), queue seed 20260921 (226 screens, 40 repeats, minimum gap 30),
+  labels SHOW 2 / MAYBE 1 / SKIP 0, K = 4, 10, 16, 32, baseline arms `jev` and `llm`.
 
 ## Comparing a future change against the same labels
 

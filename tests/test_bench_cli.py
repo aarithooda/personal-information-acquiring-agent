@@ -287,3 +287,33 @@ def test_the_readme_metric_glossary_covers_every_metric_the_report_prints():
     assert families <= set(explained_as), f"add these to the map (and to the README): {families - set(explained_as)}"
     text = (Path(cli.__file__).parent / "README.md").read_text(encoding="utf-8").lower()
     assert [f for f in families if explained_as[f] not in text] == []
+
+
+def test_the_decision_rules_say_what_the_owner_fixed_before_labelling():
+    """The rules are registered before any label exists. If someone edits them, this fails and forces the edit to be
+    deliberate: change the version (and the version history) too, as rule 7 requires."""
+    import re
+    from pathlib import Path
+
+    from benchmarks.common import BENCHMARK_VERSION
+
+    text = (Path(cli.__file__).parent / "README.md").read_text(encoding="utf-8")
+    assert f"Benchmark version: **{BENCHMARK_VERSION}**" in text
+    section = text[text.index("## Decision rules") :]
+    section = section[: section.index("## Comparing a future change")]
+    flat = re.sub(r"\s+", " ", section)
+    for required in (
+        "SHOW = 2",  # the label mapping, defined explicitly
+        "MAYBE = 1",
+        "SKIP = 0",
+        "AP treats SHOW as relevant and MAYBE and SKIP as non-relevant",
+        "new title_only recall@16 >= current Jev title_only recall@16",
+        "development/evaluation benchmark",
+        "not definitive evidence of generalization",
+        "must not be changed after seeing results",
+        "creates a new benchmark version",
+    ):
+        assert required in flat, f"decision rules no longer say: {required!r}"
+    assert "**Primary metrics:** capture@16 and nDCG@16" in flat  # the unchanged rules are still there
+    assert "fold" in flat and "No tuning on the same labels you test on" in flat
+    assert re.search(r"### Version history.*v1", section, re.S)

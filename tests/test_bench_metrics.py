@@ -145,3 +145,26 @@ def test_kappa_is_undefined_when_there_is_no_variation_or_no_pairs():
 def test_exact_agreement():
     assert m.exact_agreement([(2, 2), (1, 0), (0, 0), (2, 2)]) == 0.75
     assert m.exact_agreement([]) is None
+
+
+# ---------- the label mapping the decision rules define ----------
+
+
+def test_the_label_mapping_is_show_2_maybe_1_skip_0():
+    from benchmarks.labelset import GRADE
+
+    assert (m.SHOW, m.MAYBE, m.SKIP) == (2, 1, 0)
+    assert GRADE == {"SHOW": 2, "MAYBE": 1, "SKIP": 0}
+
+
+def test_ndcg_gains_are_the_grades_themselves_2_1_0():
+    # Ranking [MAYBE, SHOW] at K=2: DCG = 1/log2(2) + 2/log2(3); ideal = 2/log2(2) + 1/log2(3). Any other gain table differs.
+    expected = (1 / math.log2(2) + 2 / math.log2(3)) / (2 / math.log2(2) + 1 / math.log2(3))
+    assert m.summarize([1, 2], ks=(2,))["ndcg@2"] == pytest.approx(expected)
+
+
+def test_ap_counts_only_show_as_relevant_and_maybe_is_not():
+    assert m.summarize([1, 1, 0])["ap"] is None  # MAYBE alone gives nothing to find
+    assert m.summarize([1, 2, 0])["ap"] == pytest.approx(1 / 2)  # the SHOW item is at rank 2; the MAYBE ahead of it does not count
+    assert m.summarize([2, 1, 0])["ap"] == 1.0
+    assert m.summarize([1, 2, 0])["ap_lenient"] == 1.0  # the lenient variant is separate and supplementary

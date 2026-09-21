@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from benchmarks.arms import Arm, Ordering, code_version, production_order
-from benchmarks.common import BenchmarkError
+from benchmarks.common import BENCHMARK_VERSION, BenchmarkError
 from benchmarks.labelset import GRADE, LabelSet, retest_summary
 from benchmarks.metrics import DEFAULT_KS, MAYBE, SHOW, SKIP, bootstrap_metrics, effective_k, paired_delta, percentile_ci, summarize
 from benchmarks.snapshot import Snapshot, is_title_only
@@ -279,6 +279,7 @@ def analyze(snapshot: Snapshot, labels: LabelSet, arms: dict[str, Arm], *, confi
             d.update(baseline_higher=[], arm_higher=[])
     return {
         "meta": {
+            "benchmark_version": BENCHMARK_VERSION,
             "generated_at": now.isoformat(),
             "code": code(),
             "snapshot_id": snapshot.snapshot_id,
@@ -342,6 +343,7 @@ def render_markdown(result: dict) -> str:
         )
         out += [f"> **PRELIMINARY.** {reason}. Numbers are noisier than they look and the labels can still change. Do not act on them.", ""]
     out += [
+        f"- Benchmark version: {meta['benchmark_version']} (reports from different versions must not be compared)",
         f"- Snapshot `{meta['snapshot_id']}` ({meta['n_items']} items) · labels `{meta['labels_hash']}` ({meta['labels_source']}, {meta['n_labelled']} labelled: "
         + ", ".join(f"{v} {k}" for k, v in meta["label_counts"].items())
         + ")",

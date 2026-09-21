@@ -4,6 +4,11 @@ import json
 import os
 from pathlib import Path
 
+# The benchmark's identity: label definitions, item snapshot, queue, K values, primary metrics and the decision rules in
+# README.md. Changing any of them after results have been seen creates a NEW version (README, "Decision rules", rule 7):
+# bump this, add a line to the README's version history, and never compare numbers across versions.
+BENCHMARK_VERSION = "v1"
+
 BENCH_ROOT = Path(__file__).resolve().parent
 DATA_DIR = BENCH_ROOT / "data"  # git-ignored: it describes the reader's habits and opinions
 

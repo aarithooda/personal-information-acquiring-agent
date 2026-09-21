@@ -354,3 +354,21 @@ def test_while_labelling_is_unfinished_no_item_level_detail_is_produced(world):
 def test_once_every_item_is_labelled_the_item_lists_appear_even_before_freezing(world):
     result = run(world, labels=make_labels(source="live"))
     assert result["meta"]["items_hidden"] is False and result["false_negatives"]["reversed"]["rows"]
+
+
+# ---------- benchmark version ----------
+
+
+def test_every_report_says_which_benchmark_version_produced_it(world):
+    from benchmarks.common import BENCHMARK_VERSION
+
+    result = run(world)
+    assert result["meta"]["benchmark_version"] == BENCHMARK_VERSION
+    assert f"Benchmark version: {BENCHMARK_VERSION}" in an.render_markdown(result)
+
+
+def test_the_guardrail_quantity_exists_in_every_report_for_every_arm(world):
+    """Decision rule 3 compares `title_only recall@16` of a new arm with the current Jev arm's. That number must be in the
+    report, under those names, for every arm."""
+    cell = run(world)["strata"]["title_only"]["title-only"]
+    assert all("recall@16" in cell["arms"][name] for name in ("perfect", "reversed"))
