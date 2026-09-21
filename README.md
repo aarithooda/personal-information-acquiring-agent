@@ -134,7 +134,7 @@ the Python code has no Windows-specific dependencies apart from the optional `.b
 screen, but macOS and Linux are untested.
 
 ```bash
-git clone <this repository> pia
+git clone https://github.com/aarithooda/pia.git
 cd pia
 python -m venv .venv
 # Windows:        .venv\Scripts\activate
