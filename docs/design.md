@@ -281,3 +281,25 @@ a full test run. WAL mode keeps a `-shm` read-index file next to the database; i
 
 Status: **V1 complete** (M1-M7). Deliberately deferred: article-text extraction (see above), a scheduler,
 interest learning (V2).
+
+## Web UI: New, Library, Favorites (W1-W5)
+
+A minimal local web UI built *over* the core. Approved decisions (2026-09-21):
+
+**Core-change budget.** `db.py`: one appended migration (v3, `favorites`). `cli.py`: one added command
+(`pia web`). `pyproject.toml`: an optional `web` extra. Everything else lives in `src/pia/web/`. Verified at
+the end with `git diff --stat` against the pre-UI commit.
+
+| # | Decision | Alternatives | Why / trade-off | Concept |
+|---|---|---|---|---|
+| D1 | FastAPI + uvicorn, JSON API, plain `def` handlers | Flask, Django, stdlib `http.server` | Pydantic already in use; typed response models; free OpenAPI docs at `/docs`. Two new deps. | API as a contract; blocking I/O runs in a thread pool |
+| D2 | Vanilla JS + static HTML, no framework, no build | React/Vue, HTMX + templates, Streamlit | Three screens; shows the browser platform and the API directly. More manual DOM code. | Separation of front end and back end; XSS: untrusted text only via `textContent` |
+| D3 | "New" = latest briefing that had content (same default as `pia show`); structure parsed from the stored markdown | Store headline explanations in a new table (changes the core, cannot recover old briefings) | Works for every historical briefing with no core change. Couples the UI to the renderer's format, guarded by a contract test that parses real `render_briefing` output; unknown format falls back to raw text. | Read model; contract test |
+| D4 | `favorites(item_id PK, created_at)` + idempotent `PUT`/`DELETE /api/items/{id}/favorite` | `POST /toggle` | A toggle gives the wrong state on double-send or two tabs; PUT/DELETE converge. | Idempotency |
+| D5 | Read endpoints use `connect_readonly`; only the favorite endpoints write. Migrations run when the app is created. One connection per request, opened inside the handler. | One shared connection | Reuses the M7 guarantee. SQLite connections are bound to the thread that created them and handlers run in a thread pool. WAL lets `pia` run while the UI is open. | Thread affinity; least privilege |
+| D6 | Local only: bind 127.0.0.1, validate the `Host` header, no CORS, CSP header, `pia web` refuses non-loopback hosts | Bind 0.0.0.0 | Personal reading data; a webpage you visit must not be able to drive a local app (CSRF, DNS rebinding). | Threat model for localhost |
+| D7 | Library = everything shown in a briefing; toggle to include items the briefing skipped (off by default); favorites are always visible whatever their status | Shown only | Keeps all historical data reachable without cluttering the default view. | |
+| D8 | No "Check now" button in this version | Run the pipeline from the UI | Multi-minute job needs background execution and progress; it is the only action that spends network and API quota, which raises the localhost-security stakes. Run `run-pia.bat`, then refresh. | Long-running work vs request/response |
+
+Plan: W1 migration + favorites data layer; W2 read API + briefing parser; W3 favorites API + security tests;
+W4 front end; W5 `pia web`, launcher, docs, browser verification.
