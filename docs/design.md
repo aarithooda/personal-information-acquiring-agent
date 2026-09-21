@@ -489,3 +489,23 @@ its rule 7). The frozen tooling needs small additions before it can run v2: `run
 uses the legacy design on purpose); `arms._export` records `QUESTION_SET_VERSION` (v1) as the arm's question set; the
 analysis' wildcard group reads `answers["wildcard"]` (v2 has `wildcard.N`); and `rescore_jev_arm` should dispatch through
 `pia.jev.triage.design_for`. Those are tooling changes and belong to the new benchmark version, not to this one.
+
+## Benchmark v2: a fresh corpus for `jev-triage-v2` (`benchmark_v2/`)
+
+Requested 2026-09-21. Benchmark v1 stays frozen and untouched; v2 evaluates the production `jev-triage-v2` on a corpus v1 never saw, with
+the methodology fixed in [benchmark_v2/METHODOLOGY.md](../benchmark_v2/METHODOLOGY.md) before any label or model output exists.
+
+| # | Decision | Alternatives | Why / trade-off | Concept |
+|---|---|---|---|---|
+| E1 | 160 new items + 40 repeats of v1 items; the 160 are the primary evaluation set, the repeats only measure label consistency and are excluded from the primary metrics | Score all 200 together | Repeats are not independent test items; they answer "how stable are the labels?" (v1-label vs v2-label) | Independence; test-retest |
+| E2 | New items are a **seeded simple random sample** of everything PIA's sources would have returned over a past 60 days, selected by canonical-URL identity only | Hand-pick, stratify, or pick "interesting" items | Any selection by content re-introduces the selector's taste; a uniform sample keeps the natural source, topic and title-only mix | Sampling bias |
+| E3 | The period ends 2026-09-17, before v1's intake began, and every new item is checked absent from v1 by canonical URL and by (source, external id) (and against the real database) | Rely on the date range or titles | No temporal or identity overlap with v1 | Leakage |
+| E4 | arXiv, HN and RSS replay through the **production adapters unchanged**; GitHub and HF Daily Papers (which cannot fetch a past window) use thin historical variants reusing the production parser, query, filters and caps | Modify the production adapters; use a different collector | Same machinery and `RawItem` representation without touching production. Declared deviation: only the date parameters differ | Same mechanism |
+| E5 | Popularity signals are as of collection time (hindsight) and are never shown to the reader; declared as a limitation | Pretend they are historical | The APIs cannot give point-in-time values | Honest limits |
+| E6 | Labels reuse v1's blind labelling code unchanged; one screen per item; repeats are ordinary corpus items with neutral ids and a shuffled order | New UI; within-session repeats | The v1 screen shows exactly what Jev is sent and nothing else; a 200-screen queue with no origin information cannot reveal which are repeats | Blinding |
+| E7 | Primary metrics are graded/lenient (nDCG@16, lenient AP, lenient AUC) with bootstrap intervals and a permutation test; strict SHOW metrics are descriptive; decision rules D1 to D4 are fixed in advance | Strict recall@K as primary | v1 showed strict SHOW labels are too rare for inference at this size; this is a statistical lesson about prevalence, independent of any v2 item | Power |
+| E8 | `FREEZE.json` binds the corpus id, manifest hash, methodology hash and the production code's git tree hash, config hashes and profile hash; `verify` recomputes them; model output existing before the labels are frozen is flagged | A promise | "We changed nothing after seeing results" becomes checkable | Pre-registration |
+| E9 | Model-free reference orderings (newest, text-first, popularity) are pre-declared as comparators alongside the LLM Stage 1 | Compare only against LLM Stage 1 | A trivial heuristic was competitive on a different corpus; a result must be judged against it | Baselines |
+
+Not measured: Stage 2, calibration, other readers or periods. The author of the methodology had seen Benchmark v1's results; METHODOLOGY.md section 2
+states exactly what that did and did not influence.

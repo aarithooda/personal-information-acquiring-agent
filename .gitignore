@@ -22,3 +22,6 @@ config/interests.toml
 
 # Benchmark: the item snapshot, your labels and the arm results describe your reading habits. Code and docs are committed.
 benchmarks/data/
+
+# Benchmark v2: the corpus, labels, arms and reports describe the reader's habits and opinions. Code and the methodology are committed.
+benchmark_v2/data/

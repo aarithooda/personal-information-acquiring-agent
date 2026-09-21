@@ -259,6 +259,7 @@ is tested with Node when it is installed.
   better than v1 or than the LLM triage. The shortlist is still top-K by score, so a run can be all AI papers and no
   mathematics even though the profile asks for discovery (a discovery lane is not built). See docs/design.md,
   "Jev layer v2", for the reasoning, what was deliberately not changed, and how to evaluate it.
+- **Jev v2 evaluation:** a fresh, blind evaluation corpus and a frozen methodology for `jev-triage-v2` are in [benchmark_v2/README.md](benchmark_v2/README.md).
 - **Stage 1 quality is not yet measured against human judgment.** A labelled benchmark (blind labelling tool, baseline arms,
   metrics, false-negative analysis) is set up in [benchmarks/README.md](benchmarks/README.md); the labelling is the reader's part.
 - arXiv is fetched newest-first and capped, so it is a sample, not a complete feed.
