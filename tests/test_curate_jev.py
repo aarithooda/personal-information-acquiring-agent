@@ -4,7 +4,7 @@ from datetime import timedelta
 
 import pytest
 from fakes import T0, FakeLLM, FakeSource, SmartLLM, make_item, triaged_row
-from test_jev_triage import PROFILE_TOML, FakeJev
+from jevfakes import V2_PROFILE_TOML, SyntheticJev
 
 from pia.briefing.curate import make_curator
 from pia.db import connect
@@ -21,7 +21,7 @@ STRONG = {7, 13, 21, 22}  # the four items Jev should love
 @pytest.fixture
 def profile(tmp_path):
     path = tmp_path / "interests.toml"
-    path.write_text(PROFILE_TOML, encoding="utf-8")
+    path.write_text(V2_PROFILE_TOML, encoding="utf-8")
     return load_profile(path)
 
 
@@ -32,14 +32,16 @@ def conn():
     connection.close()
 
 
-def jev_script(title, call_number):
+def script(title):
     n = int(title.split()[-1])
-    return dict(match=3, substance=3, build=0.9) if n in STRONG else dict(match=1, substance=1, build=0.2)
+    if n in STRONG:
+        return {"choice": {"priority_tier": {"tier_1": 1.0}}, "noul": {"signal.": 0.9}}
+    return {"choice": {"priority_tier": {"tier_3": 1.0}}}  # a weak but not worthless fit: kept out of the top, not dropped as noise
 
 
 def briefing(conn, profile, llm, count=30):
     source = FakeSource("hn", [make_item("hn", n, T0 - HOUR, content=f"Text {n}") for n in range(count)])
-    triage = make_jev_triage(FakeJev(jev_script), profile, workers=2)
+    triage = make_jev_triage(SyntheticJev(script=script), profile, workers=2)
     return run_briefing(conn, None, [source], T0, prepare=make_curator(llm, triage=triage, profile=profile))
 
 

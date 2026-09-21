@@ -41,6 +41,7 @@ Put your key in a file named `.env` in the project folder:
 ```
 GROQ_API_KEY=your_key_here
 TYPESAFE_API_KEY=your_jev_key_here   # optional: enables Jev at Stage 1 (JEV_API_KEY also works)
+JEV_MODEL=jev-1.13.0                 # optional: pin the Jev version (default: the alias jev-latest, which moves)
 ```
 
 To use Jev you also need your interest profile: copy `config/interests.example.toml` to `config/interests.toml` and
@@ -117,10 +118,12 @@ Code decides everything that must be exact; the LLM only supplies judgment.
 
 - **Deterministic code:** fetching and retrying, URL identity and dedup, timestamps, what counts as "new", how many
   items to show, ranking, layout, and the checkpoint.
-- **Stage 1, Jev (default when configured):** a decision model. For each item it answers nine small typed questions
-  (topic match, substance, low-value pattern, wildcard, ...) using *your interest profile*, and code combines the
-  answers into a relevance score. About 0.4 s per item, a fraction of a cent for a full run, one request per item run
-  four at a time. Jev cannot write text, so it produces no summaries.
+- **Stage 1, Jev (default when configured):** a decision model. Each item gets four small requests, each carrying only
+  the parts of *your interest profile* its questions need: one multiple-choice question (which of your priority tiers
+  the item is about) plus one yes/no question per entry of your own lists (each signal you value, each low-value
+  pattern, each wildcard, each thing you build). Code combines the returned probabilities into a relevance score.
+  About 1.6 s and roughly $0.0003 per item, four items at a time. Jev cannot write text, so it produces no summaries.
+  The earlier nine-question design is kept as `jev-triage-v1`, so results stored under it can still be read.
 - **Stage 1, LLM (`--triage llm`, and the automatic fallback if Jev is down):** `gpt-oss-20b` gives each item a
   category, an importance score and a one-line summary as schema-constrained JSON, validated again in code.
 - **Stage 2 (`gpt-oss-120b`):** the editor. It sees a shortlist side by side, picks the developments that truly matter
@@ -154,14 +157,17 @@ categories, minimum Hacker News points, or minimum GitHub stars.
 | First-run lookback (3 days), maximum lookback (14 days), overlap | `src/pia/collect.py` |
 | Models, prompts, prompt version | `src/pia/llm/prompts.py` |
 | Triage batch size, attempts before giving up on an item | `src/pia/llm/enrich.py` |
-| Jev questions, the weights that combine the answers (version 0, unvalidated), concurrency | `src/pia/jev/triage.py` |
+| Jev questions and how the answers combine (`jev-triage-v2`; one named prior, unvalidated), concurrency | `src/pia/jev/design.py`, `src/pia/jev/triage.py` |
+| Pin the Jev version (the default alias `jev-latest` moves with releases) | `JEV_MODEL=jev-1.13.0` in `.env` |
 | What Jev and the editor are told about you | `config/interests.toml` (compiled by `src/pia/profile.py`) |
 
 ## Privacy and safety
 
-- **Sent to Jev (TypeSafe):** for every item, a *trimmed* copy of your profile (interest areas, signals and rules; not your
-  name, character descriptions, current projects or learning style), the item's title, source type and up to 500
-  characters of its text. TypeSafe states it does not train on customer data. Popularity numbers are not sent.
+- **Sent to Jev (TypeSafe):** for every item, four requests. One carries only the item (source type, title, up to 500
+  characters of text) and **none** of your profile. The other three each carry only the parts of your profile that their
+  questions point at (your interest areas and priority tiers; your valued signals and low-value patterns; your
+  wildcards). Not your name, character descriptions, current projects, learning style or the free-text guidance
+  sections. TypeSafe states it does not train on customer data. Popularity numbers are not sent.
 - **Sent to Groq (editor, Jev mode):** the shortlisted items plus your profile as text (everything except your name).
 - **Sent to Groq (LLM triage mode):** item titles, the first few hundred characters of each item's text, source names and popularity
   numbers. Not your identity, not your reading history. The API key travels only in the `Authorization` header to
@@ -248,10 +254,11 @@ is tested with Node when it is installed.
 - **Most items are judged on a title alone**, mainly Hacker News (measured: 58.6% of the first real briefing's 157
   items). Article-text extraction is a deliberate future consideration, **not implemented**; the analysis, options and
   constraints are in [docs/design.md](docs/design.md) under "Future consideration: article text".
-- **Jev's scoring is version 0 and unvalidated.** The weights in `jev/triage.py` are reasoned, not tuned. Measured on
-  the first real run: title-only items (Hacker News) score systematically low because there is little to judge,
-  and the shortlist is top-K by score, so a run can be all AI papers and no mathematics even though the profile asks
-  for discovery. See docs/design.md, "Jev at Stage 1", for the data and the options.
+- **Jev's scoring is unvalidated.** `jev-triage-v2` follows TypeSafe's documented guidance and has one named prior
+  (`VALUE_FLOOR`) instead of tuned weights, but it has not been evaluated against human judgment, and it may not be
+  better than v1 or than the LLM triage. The shortlist is still top-K by score, so a run can be all AI papers and no
+  mathematics even though the profile asks for discovery (a discovery lane is not built). See docs/design.md,
+  "Jev layer v2", for the reasoning, what was deliberately not changed, and how to evaluate it.
 - **Stage 1 quality is not yet measured against human judgment.** A labelled benchmark (blind labelling tool, baseline arms,
   metrics, false-negative analysis) is set up in [benchmarks/README.md](benchmarks/README.md); the labelling is the reader's part.
 - arXiv is fetched newest-first and capped, so it is a sample, not a complete feed.

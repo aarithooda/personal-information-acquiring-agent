@@ -310,7 +310,7 @@ def test_when_jev_is_down_the_existing_llm_triage_takes_over(conn, profile):
         def system_one(self, state, questions):
             raise LLMUnavailable("down")
 
-    triage = make_jev_triage(Down(), profile, fallback_llm=SmartLLM(), workers=1, max_consecutive_failures=2)
+    triage = make_jev_triage(Down(), profile, fallback_llm=SmartLLM(), workers=1, max_consecutive_failures=2, design=jt.LEGACY_V1)
     report = triage(conn, T0)
     assert report.enriched == 4 and report.remaining == 0
     assert {r["model"] for r in enrichment_rows(conn)} == {"openai/gpt-oss-20b"}  # the legacy path did the work
@@ -319,7 +319,7 @@ def test_when_jev_is_down_the_existing_llm_triage_takes_over(conn, profile):
 def test_the_fallback_is_not_used_when_jev_works(conn, profile):
     add_items(conn, 3)
     llm = SmartLLM()
-    make_jev_triage(FakeJev(), profile, fallback_llm=llm, workers=1)(conn, T0)
+    make_jev_triage(FakeJev(), profile, fallback_llm=llm, workers=1, design=jt.LEGACY_V1)(conn, T0)
     assert llm.calls == []
 
 
@@ -330,5 +330,5 @@ def test_without_a_fallback_an_outage_leaves_the_items_pending_for_the_next_run(
         def system_one(self, state, questions):
             raise LLMUnavailable("down")
 
-    report = make_jev_triage(Down(), profile, fallback_llm=None, workers=1, max_consecutive_failures=2)(conn, T0)
+    report = make_jev_triage(Down(), profile, fallback_llm=None, workers=1, max_consecutive_failures=2, design=jt.LEGACY_V1)(conn, T0)
     assert report.stopped_early and report.remaining == 3

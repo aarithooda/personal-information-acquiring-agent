@@ -186,6 +186,9 @@ PROFILE = """
 name = "AI agents"
 priority = "very_high"
 specific_subtopics = ["tool use"]
+[priority_hierarchy]
+tier_1 = ["AI engineering"]
+tier_2 = ["Research"]
 """
 
 
@@ -210,6 +213,7 @@ def test_a_configured_jev_setup_reports_the_key_and_the_profile_without_leaking_
     assert checks["Jev API key"].status == "ok" and ".env" in checks["Jev API key"].detail
     profile_check = checks["Interest profile"]
     assert profile_check.status == "ok" and "hash" in profile_check.detail and "tokens" in profile_check.detail
+    assert "requests per item" in profile_check.detail and "largest" in profile_check.detail  # the cost model of the current design
     assert all(JEV_KEY not in c.name + c.detail for c in checks.values())
 
 
@@ -232,7 +236,7 @@ def test_an_invalid_profile_is_a_failure(setup):
 
 
 def test_a_very_large_profile_gets_an_advisory_warning(setup):
-    big = PROFILE + "\n[relevance_guidance]\nstrong_relevance_if = [" + ", ".join(f'"{"word " * 40}{i}"' for i in range(140)) + "]\n"
+    big = PROFILE + "\n[technical_interests]\nvery_high = [" + ", ".join(f'"{"word " * 40}{i}"' for i in range(140)) + "]\n"  # a section Jev is actually sent
     profile_path = with_jev(setup, profile_text=big)
     result = check(setup, profile_path=profile_path)["Interest profile"]
     assert result.status == "warn" and "large" in result.detail
@@ -258,3 +262,14 @@ def test_online_reports_a_rejected_jev_key(setup):
     profile_path = with_jev(setup)
     result = check(setup, profile_path=profile_path, online=True, client=jev_and_groq_client(401), sources=[], now=T0)["Jev API"]
     assert result.status == "fail" and "rejected" in result.detail and JEV_KEY not in result.detail
+
+
+def test_a_profile_the_current_jev_design_cannot_use_is_a_failure_with_the_reason(setup):
+    profile_path = with_jev(setup, profile_text='[low_value_information]\nusually_low_value = ["x"]\n')
+    result = check(setup, profile_path=profile_path)["Interest profile"]
+    assert result.status == "fail" and "priority tiers" in result.detail
+
+
+def test_sections_that_jev_is_never_sent_do_not_count_toward_the_size_advisory(setup):
+    prose = PROFILE + "\n[relevance_guidance]\nstrong_relevance_if = [" + ", ".join(f'"{"word " * 40}{i}"' for i in range(140)) + "]\n"
+    assert check(setup, profile_path=with_jev(setup, profile_text=prose))["Interest profile"].status == "ok"

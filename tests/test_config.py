@@ -91,3 +91,15 @@ def test_a_missing_jev_key_says_which_names_are_accepted_and_never_echoes_other_
 def test_groq_lookup_is_unchanged_by_the_refactor(tmp_path):
     (tmp_path / ".env").write_text(f"JEV_API_KEY={JEV}\nGROQ_API_KEY={KEY}\n")
     assert get_groq_api_key(root=tmp_path, environ={}) == KEY
+
+
+# ---------- Jev model pinning: aliases such as jev-latest move with releases ----------
+
+
+def test_the_jev_model_can_be_pinned_from_a_file_or_the_environment_and_defaults_to_none(tmp_path):
+    from pia.config import get_jev_model
+
+    assert get_jev_model(root=tmp_path, environ={}) is None  # nothing configured: the client's default alias applies
+    (tmp_path / ".env").write_text("JEV_MODEL=jev-1.13.0\n")
+    assert get_jev_model(root=tmp_path, environ={}) == "jev-1.13.0"
+    assert get_jev_model(root=tmp_path, environ={"JEV_MODEL": "jev-1.14.0"}) == "jev-1.14.0"  # the real environment wins

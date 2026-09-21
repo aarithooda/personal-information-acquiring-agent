@@ -85,3 +85,15 @@ def find_jev_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.
 
 def get_jev_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str:
     return find_jev_api_key(root, environ)[0]
+
+
+def get_jev_model(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str | None:
+    """A pinned Jev model version (e.g. JEV_MODEL=jev-1.13.0), or None to use the client's default alias.
+
+    TypeSafe's docs: aliases such as `jev-latest` "update automatically with new releases, so pinning specific version
+    IDs is recommended" when results are compared over time. Pinning is opt-in, because a pinned version can eventually
+    be retired; every stored row records the versioned id that actually answered either way."""
+    try:
+        return _find_key(("JEV_MODEL",), root, environ, "")[0]
+    except ConfigError:
+        return None

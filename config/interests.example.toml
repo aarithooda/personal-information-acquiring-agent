@@ -2,8 +2,14 @@
 # config/interests.toml is git-ignored because it describes you personally; this example is committed.
 #
 # The loader (src/pia/profile.py) understands these sections. Every section is optional, but a profile with
-# none of them is rejected. Keep the whole file short: it is sent to the triage model with EVERY item, and a
-# long profile costs tokens and can make a small decision model less accurate ("context rot").
+# none of them is rejected. Keep the whole file short: the parts Jev's questions point at are sent with EVERY item,
+# and a long profile costs tokens and can make a small decision model less accurate ("context rot").
+#
+# What Jev uses (each list ENTRY becomes its own yes/no question, so write one short idea per entry, in order of
+# importance where lists are ranked): priority_hierarchy (tier_1, tier_2, ... lists: required unless you have
+# building_interests or discovery.strong_wildcards), building_interests (lists), high_value_information (lists),
+# low_value_information (usually_low_value, exceptions), discovery (strong_wildcards), and the interest areas.
+# Free-text prose fields and relevance_guidance are shown to the editor only.
 # Write short, concrete phrases (situations, not adjectives).
 
 [profile]                      # NOT sent to the triage model (only user_stage / core_orientation go to the editor)

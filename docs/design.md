@@ -420,3 +420,72 @@ Observed while freezing the baselines (real APIs): Jev returned HTTP 503 for eve
 after the circuit breaker tripped and, by design, **saved nothing** (0 of 186 scored) instead of a misleading partial arm;
 finished items are kept in a scratch database and a re-run resumes without paying twice. The LLM arm met Groq's usual 429
 rate limits (absorbed by the retry layer) and at least one HTTP 400 on a batch (that batch's items stay pending and are retried).
+
+## Jev layer v2 (question set `jev-triage-v2`)
+
+Requested 2026-09-21: make the Jev integration as strong as it can be, **from TypeSafe's documentation and first
+principles, not by tuning against any labelled data**. Benchmark v1 stays frozen and was not run. Sources read:
+docs.typesafe.ai `primitives`, `primitives/{noul,score,choice}`, `confidence`, `patterns/{composite-scoring,confidence-routing,fan-out}`,
+`concepts/state`, `models`, `api`, `introduction/machine-learning-primer`, `cookbooks/{rerank_typesafe,consistency_noul_cookbook}`,
+and **`model-jaggedness/jev-1.13`** (known limitations).
+
+### What the documentation says, against what v1 did
+
+| # | Documented | v1 | Verdict |
+|---|---|---|---|
+| D1 | One condition per Noul; a compound question's value "means less" | `low_value_pattern`, `wildcard`, `buildable` each asked about a whole LIST (a 13-way disjunction) | defect |
+| D2 | Score levels: concrete, independent, ONE dimension | `interest_match` mixed topic and priority tier in compound levels; `substance` mixed technical-ness and significance | defect |
+| D3 | A Score's decimal has "weak numerical calibration"; probabilities are the calibrated part | `derive` used `score / 3` as a precise scale and ignored `probabilities` | defect |
+| D4 | "Accuracy falls as the state grows with content unrelated to the decision"; send only necessary fields | every question saw the whole ~4k-token profile; questions needing no profile (category, injection) saw it too | defect |
+| D5 | "Literal reading": implied conditions are read at face value | `buildable`: "could **plausibly** become a component..." | defect |
+| D6 | Confidence "tells you whether to act", not what the answer is | stored, never used; `too_little_info` computed and never used | under-use |
+| D7 | Aliases move; pin versions if results are compared over time | default `jev-latest`, no way to pin | gap |
+| D8 | Questions are independent and cheap to fan out | 9 questions | under-use |
+
+### Decisions
+
+| # | Decision | Alternatives | Why / trade-off | Concept |
+|---|---|---|---|---|
+| K1 | One Noul per ENTRY of each profile list (each low-value pattern, exception, valued signal, wildcard, building interest), pointing at the entry with the documented backtick path; combined with `max` | One Noul per list | D1. The reader's own words define the taste (nothing is invented); each answer is inspectable ("penalty_by: low.pattern.7"). `max` (not a sum) because the probabilities are correlated and the docs guarantee no structural invariants, so thirteen weak 0.2s must not add up to a penalty. Cost: about 69 questions per item. | Atomic questions; fuzzy OR |
+| K2 | Priority is ONE Choice over the profile's own tiers plus `none`; the expected rank weight of its probability distribution is used | A Score rubric; the Choice winner only | D2, D3. Docs: use Choice for "which of these" and offer an "other/none". Weights are `(n - rank) / n`: the profile orders tiers but gives no magnitudes, so linear-by-rank invents none. | Expected value over a distribution |
+| K3 | No Score question feeds the formula | Keep Scores | D3 | Use the calibrated part of an answer |
+| K4 | Four requests per item, each with only the profile sections its questions point at; the item-only request (category, injection, subject unclear) sends NO profile | One request with the whole profile | D4. Independence of questions is documented, so splitting loses nothing. Cost: ~6.5k input tokens per item (v1 4.4k; about $0.0003 per item), ~1.6 s per item, 4x the requests (well under the documented 1,200/min at 4 workers). | Context rot; least data |
+| K5 | `relevance = reach x (1 - low_value) x (0.5 + 0.5 x value)`; `reach = max(interest, build, discovery)` | v1's additive blend; the docs' plain weighted sum; noisy-OR; a plain product | Mirrors the profile's own rule ("substantive AND (on-topic OR buildable OR surprising), minus low-value"). Any one route to relevance suffices; substance alone earns nothing (v1 paid 35% credit for it); `value` can at most HALVE relevance, so evidence that a title cannot carry never erases a strong fit. The `0.5` is the only constant, a named PRIOR (`VALUE_FLOOR`), not fitted. The docs' weighted sum is a valid pattern; it was not chosen because it lets substance compensate for zero interest. | Non-compensatory AND/OR; bounded modulation |
+| K6 | `subject_unclear`, the models' confidences and whether the item had text are stored beside the score and never inside it. Title-only is a FACT the code knows, so it is recorded (`facts.title_only`) and never asked | Fold `too_little_info` in as a penalty or shrink toward a prior | D6. A property test pins that `relevance` is identical for the same answers whether or not the item had text. **This does not "solve" title-only items**: the questions are worded to be answerable from a title, and the bounded `value` factor limits the effect of missing evidence, but a title-only item can still score lower because its signal answers are lower. A structural fix (a reserved lane for uncertain-but-promising items, per the docs' confidence-gated routing) is deferred. | Evidence vs relevance; missing data |
+| K7 | Popularity and cross-source signals stay OUT of the Jev decision layer (as in J8) | Fold them into relevance | They are a separate axis (public salience vs personal fit). **Flagged, not changed:** `rank.py` adds up to +2 on a 1-5 scale (about half the range) and gives items with no popularity metric (arXiv, RSS) 0; that weighting is unexamined and shared with the LLM triage. | Separate concerns |
+| K8 | `LEGACY_V1` stays the default of the low-level `JevTriager`; the production factory `make_jev_triage` uses the current design. `design_for(question_set)` maps a stored row to the code that derives it. v1 code and stored v1 rows are untouched | Replace v1 | The frozen benchmark tooling constructs `JevTriager` directly and must keep measuring what it measured. | Versioned formats |
+| K9 | Stored row: raw answers for every question, `plan` (what the ids mean), `facts`, `evidence` (which question drove reach, value and penalty), per-request usage, all model ids seen. `JEV_MODEL` pins the version | Store only the score | Raw preserved (D4 of the project's principles): the formula can change and old rows can be re-derived offline. | Raw vs derived |
+| K10 | Questions are built from what the profile HAS; a profile with no tiers, building interests or wildcards is refused with a clear message; the doctor reports per-request tokens | Assume every section exists (v1 asked about `building_interests` even when absent) | Robustness for anyone else's profile | Fail loudly |
+
+### Observed (a plumbing check, not evidence of quality)
+
+Against the real API, on 8 hand-written synthetic items (none from the benchmark), with the checks declared beforehand and no
+constant or wording changed from what came back: all four requests per item were accepted; all 69 questions answered
+(3 + 19 + 38 + 9); about 1.6 s per item; 6.5k input tokens per item (the doctor's estimate: 6.7k). Directions were sane: an
+on-topic title-only tool scored 0.73, off-topic and marketing items about 0.02, an injection attempt was detected (0.98) and
+zeroed. The docs state no limit on questions per request; 38 in one request was accepted.
+
+### Deliberately NOT changed
+
+`rank.py` (popularity/cross-source arithmetic); the curator's hard gates (`category == "other"` and `importance <= 1` drop an item
+outright, an absolute cutoff at relevance 0.125); a discovery lane or uncertainty routing to the editor; batching several items
+in one request (not documented as supported); self-consistency sampling (the docs report a per-question standard deviation of
+about 0.01, so it would buy little); parallelising an item's four requests (a latency optimisation).
+
+### Risks and open questions
+
+Unknown per-request question limits (none documented; 38 worked); the calibration of per-entry Nouls is unmeasured, and the
+docs say a Noul and its negation need not sum to 1, so absolute levels may drift between question types; `max` ignores
+corroboration between several matching entries; the wildcard route is weighted like any other, so the profile's "unusually
+high novelty" threshold is enforced only through the bounded `value` factor; an item costs four round trips, so one failing
+request fails the item (no partial credit, no per-group retry); and **the design is untested against human judgment and may
+not be better than v1 or than the LLM triage**.
+
+### How this must be evaluated
+
+Not on benchmark v1's labels. They have been seen, and so has an analysis of them, by whoever designed v2, which contaminates
+them as an evaluation of a redesign even though no coefficient was fitted to them. Use fresh labels (a v2 benchmark, per
+its rule 7). The frozen tooling needs small additions before it can run v2: `run_jev_arm` needs a `design` argument (today it
+uses the legacy design on purpose); `arms._export` records `QUESTION_SET_VERSION` (v1) as the arm's question set; the
+analysis' wildcard group reads `answers["wildcard"]` (v2 has `wildcard.N`); and `rescore_jev_arm` should dispatch through
+`pia.jev.triage.design_for`. Those are tooling changes and belong to the new benchmark version, not to this one.

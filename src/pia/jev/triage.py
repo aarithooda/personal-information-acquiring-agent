@@ -6,22 +6,28 @@ say to decompose), never "is this worth showing?". Each answer is stored RAW in 
 `derive()` turns the raw answers into the relevance, importance and category the rest of the pipeline already
 understands. Because it works from the stored form, the formula can be changed later without calling Jev again.
 
-Requests are one per item (Jev evaluates one state at a time), run a few at a time, and each result is saved the
-moment it arrives. All SQLite writes stay on the calling thread: workers only make HTTP calls.
+Two question sets live side by side. `jev-triage-v1` (this file: `build_questions` + `derive`) is the LEGACY design and
+is kept exactly as it was, because every stored v1 row and the frozen benchmark measure it. `jev-triage-v2`
+(pia.jev.design) is the current design and is what `make_jev_triage` uses. A design decides which requests are made for
+an item (v1: one; v2: four, each with only the profile data it needs) and how the answers combine; `design_for` maps the
+`question_set` stored with a row back to the code that derives it.
+
+Requests are made per item (Jev evaluates one state at a time), a few items at a time, and each item's result is saved
+the moment it is complete. All SQLite writes stay on the calling thread: workers only make HTTP calls.
 """
 
 import logging
 import sqlite3
 from collections.abc import Callable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
 from pia.jev.client import SystemOneResponse, choice, noul, score
+from pia.jev.design import CURRENT_DESIGN, SOURCE_KINDS, Derived, Design, Plan, Request, item_entry  # noqa: F401  (re-exported)
 from pia.llm.client import LLM, LLMBadOutput, LLMError
 from pia.llm.enrich import MAX_TRIAGE_ATTEMPTS, EnrichReport, enrich_pending
-from pia.llm.prompts import CONTENT_CHARS
 from pia.profile import Profile
 from pia.state import items_needing_enrichment, record_triage_failures, save_enrichments
 
@@ -38,13 +44,6 @@ WILDCARD_CREDIT = 0.85  # a strong wildcard can stand in for topical match, disc
 LOW_VALUE_PENALTY = 0.60  # at most this fraction is removed for a low-value pattern that no exception excuses
 INJECTION_ZERO_AT = 0.90  # only a near-certain injection is dropped; see the note in derive()
 SCORE_LEVELS = 4  # levels in each Score question (0..3)
-
-SOURCE_KINDS = {
-    "hn": "Hacker News link",
-    "arxiv": "arXiv paper",
-    "hf_papers": "Hugging Face daily paper",
-    "github": "GitHub repository",
-}
 
 
 def build_questions() -> dict[str, dict]:
@@ -96,23 +95,10 @@ def build_questions() -> dict[str, dict]:
 def build_state(profile_state: dict, item: dict) -> dict:
     """What Jev sees: the trimmed profile and the item. Popularity signals are deliberately NOT included: the ranker
     already accounts for them, and keeping them out avoids rewarding "popular but unrelated" items."""
-    entry = {"source": SOURCE_KINDS.get(item["source"], item["source"]), "title": item["title"]}
-    text = (item["content_raw"] or "").strip()[:CONTENT_CHARS]
-    if text:  # omit the key for title-only items instead of sending an empty string
-        entry["text"] = text
-    return {"reader_profile": profile_state, "item": entry}
+    return {"reader_profile": profile_state, "item": item_entry(item)}
 
 
 # ---------- answers -> relevance (pure, works from the stored form) ----------
-
-
-@dataclass
-class Derived:
-    relevance: float
-    importance: int
-    category: str
-    features: dict[str, float]
-    flags: list[str] = field(default_factory=list)
 
 
 def derive(answers: dict[str, dict]) -> Derived:
@@ -153,6 +139,33 @@ def derive(answers: dict[str, dict]) -> Derived:
     return Derived(relevance, 1 + round(4 * relevance), category, features, flags)
 
 
+# ---------- designs: which requests an item needs and how the answers combine ----------
+
+
+class LegacyV1:
+    """Question set v1, unchanged: ONE request per item carrying the whole trimmed profile and all nine questions."""
+
+    version = QUESTION_SET_VERSION
+
+    def plan(self, profile_state: dict) -> Plan:
+        return Plan(self.version, (Request("all", profile_state, build_questions()),), {})
+
+    def derive(self, answers: dict[str, dict], structure: dict, facts: dict) -> Derived:
+        return derive(answers)
+
+
+LEGACY_V1 = LegacyV1()
+DESIGNS: dict[str, Design] = {LEGACY_V1.version: LEGACY_V1, CURRENT_DESIGN.version: CURRENT_DESIGN}
+
+
+def design_for(question_set: str) -> Design:
+    """The code that derives a stored row, looked up by the `question_set` stored in its details."""
+    try:
+        return DESIGNS[question_set]
+    except KeyError:
+        raise KeyError(f"unknown Jev question set {question_set!r}; known: {', '.join(DESIGNS)}") from None
+
+
 # ---------- the triager ----------
 
 
@@ -171,17 +184,44 @@ class _Jev(Protocol):
     def system_one(self, state: dict, questions: dict) -> SystemOneResponse: ...
 
 
+@dataclass
+class Judgement:
+    """Everything Jev said about one item, across all of its requests."""
+
+    answers: dict[str, dict]  # question id -> raw answer (plain dicts, as stored)
+    usage: dict[str, int]  # summed over the item's requests
+    models: list[str]  # the versioned ids that answered, sorted; more than one only if an alias moved mid-item
+    requests: list[dict]  # per request: name, question count, input tokens
+
+
 class JevTriager:
-    def __init__(self, client: _Jev, profile: Profile, *, workers: int = 4, max_consecutive_failures: int = 3):
+    """`design` defaults to the LEGACY v1 design so existing callers (notably the benchmark tooling, which measures the
+    design that was frozen) keep exactly their behaviour. The production wiring, `make_jev_triage`, opts into the
+    current design."""
+
+    def __init__(self, client: _Jev, profile: Profile, *, workers: int = 4, max_consecutive_failures: int = 3, design: Design | None = None):
         self._client = client
         self._profile = profile
-        self._profile_state = profile.jev_state()  # compiled once, not per item
-        self._questions = build_questions()
+        self._design = design or LEGACY_V1
+        self._plan = self._design.plan(profile.jev_state())  # compiled once, not per item (raises DesignError for an unusable profile)
         self._workers = workers
         self._max_failures = max_consecutive_failures
 
-    def _ask(self, item: dict) -> SystemOneResponse:
-        return self._client.system_one(build_state(self._profile_state, item), self._questions)
+    def _ask(self, item: dict) -> Judgement:
+        """All of one item's requests, in order. If any fails the whole item fails: a half-answered item is never stored."""
+        entry = item_entry(item)
+        answers: dict[str, dict] = {}
+        models: set[str] = set()
+        usage = {"input_tokens": 0, "output_tokens": 0}
+        requests = []
+        for request in self._plan.requests:
+            response = self._client.system_one(self._plan.state_for(request, entry), request.questions)
+            answers.update({name: answer.model_dump() for name, answer in response.answers.items()})
+            models.add(response.model)
+            usage["input_tokens"] += response.usage.input_tokens
+            usage["output_tokens"] += response.usage.output_tokens
+            requests.append({"name": request.name, "questions": len(request.questions), "input_tokens": response.usage.input_tokens})
+        return Judgement(answers, usage, sorted(models), requests)
 
     def triage_pending(self, conn: sqlite3.Connection, now: datetime, *, limit: int | None = None) -> EnrichReport:
         rows = items_needing_enrichment(conn, limit)
@@ -225,7 +265,7 @@ class JevTriager:
                                 report.stopped_early = True  # circuit breaker: submit nothing more
                         else:
                             consecutive_outages = 0
-                            self._save(conn, item_id, response, now)
+                            self._save(conn, item_id, response, items[item_id], now)
                             report.enriched += 1
                         if not report.stopped_early:
                             submit_next()
@@ -236,22 +276,27 @@ class JevTriager:
         report.remaining = len(rows) - report.enriched - report.failed_items
         return report
 
-    def _save(self, conn: sqlite3.Connection, item_id: int, response: SystemOneResponse, now: datetime) -> None:
-        raw = {name: answer.model_dump() for name, answer in response.answers.items()}
-        derived = derive(raw)
+    def _save(self, conn: sqlite3.Connection, item_id: int, judgement: Judgement, item: dict, now: datetime) -> None:
+        facts = {"title_only": not (item["content_raw"] or "").strip()}  # a fact the code knows; recorded, never asked
+        derived = self._design.derive(judgement.answers, self._plan.structure, facts)
         details = {
-            "question_set": QUESTION_SET_VERSION,
-            "answers": raw,
-            "usage": response.usage.model_dump(),
+            "question_set": self._design.version,
+            "answers": judgement.answers,
+            "usage": judgement.usage,
             "features": derived.features,
             "flags": derived.flags,
         }
+        if self._plan.structure:  # v2: enough to re-derive from the stored row alone, and to see how the item was asked about
+            details["plan"] = self._plan.structure
+            details["requests"] = judgement.requests
+            details["models"] = judgement.models
+        details.update(derived.extra)
         result = TriageResult(derived.category, derived.importance, derived.relevance, details)
         save_enrichments(
             conn,
             {item_id: result},
-            model=response.model,  # the VERSIONED id that answered (e.g. jev-1.13.0), not the alias we asked for
-            prompt_version=QUESTION_SET_VERSION,
+            model="+".join(judgement.models),  # the VERSIONED id(s) that answered (e.g. jev-1.13.0), not the alias we asked for
+            prompt_version=self._design.version,
             now=now,
             profile_hash=self._profile.hash,
         )
@@ -264,10 +309,11 @@ def make_jev_triage(
     fallback_llm: LLM | None = None,
     workers: int = 4,
     max_consecutive_failures: int = 3,
+    design: Design | None = None,
 ) -> Callable[..., EnrichReport]:
     """The Stage 1 step for the curator. If Jev stops responding and a fallback LLM is given, the existing LLM triage
     finishes the remaining items (graceful degradation, as everywhere else in PIA); otherwise they wait for next run."""
-    triager = JevTriager(client, profile, workers=workers, max_consecutive_failures=max_consecutive_failures)
+    triager = JevTriager(client, profile, workers=workers, max_consecutive_failures=max_consecutive_failures, design=design or CURRENT_DESIGN)
 
     def triage(conn: sqlite3.Connection, now: datetime, limit: int | None = None) -> EnrichReport:
         report = triager.triage_pending(conn, now, limit=limit)

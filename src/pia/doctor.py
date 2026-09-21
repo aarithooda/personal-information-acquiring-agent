@@ -6,7 +6,6 @@ list its models (this sends no data and costs nothing). The API key is never pri
 whether it was found, where, and that Groq accepts it.
 """
 
-import json
 import os
 import sqlite3
 import sys
@@ -23,6 +22,7 @@ from pia.db import MIGRATIONS
 from pia.history import DatabaseMissing, connect_readonly
 from pia.http import SourceError, request_with_retry
 from pia.jev.client import JevClient
+from pia.jev.design import CURRENT_DESIGN
 from pia.llm.client import BASE_URL, LLMError
 from pia.profile import ProfileError, approx_tokens, load_profile
 from pia.sources.base import Source
@@ -113,7 +113,7 @@ def _check_source_online(source: Source, client: httpx.Client, now: datetime) ->
     return Check(name, "ok", f"reachable ({len(items)} item{'s' if len(items) != 1 else ''} in the last day; not stored)")
 
 
-PROFILE_TOKEN_ADVISORY = 6000  # the profile is sent with every item; beyond this it costs more and may blur the decision
+PROFILE_TOKEN_ADVISORY = 6000  # input tokens in ONE Jev request; beyond this it costs more and may blur the decision (docs: 32k tokens of state plus the longest question is the hard limit)
 
 
 def _check_jev_key(found: tuple[str, str] | None) -> Check:
@@ -130,10 +130,17 @@ def _check_profile(path: Path | None) -> Check:
         profile = load_profile(path)
     except ProfileError as exc:
         return Check("Interest profile", "fail", str(exc))
-    jev_tokens = approx_tokens(json.dumps(profile.jev_state(), ensure_ascii=False))
+    try:
+        per_request = CURRENT_DESIGN.plan(profile.jev_state()).token_estimates()  # what the current Jev design would send per item
+    except ProfileError as exc:
+        return Check("Interest profile", "fail", str(exc))
+    largest = max(per_request.values())
     editor_tokens = approx_tokens(profile.llm_text())
-    detail = f"hash {profile.hash}; about {jev_tokens} tokens sent to Jev with every item, {editor_tokens} tokens to the editor"
-    if jev_tokens > PROFILE_TOKEN_ADVISORY:
+    detail = (
+        f"hash {profile.hash}; {len(per_request)} Jev requests per item (about {sum(per_request.values())} input tokens in all, "
+        f"{largest} in the largest), {editor_tokens} tokens to the editor"
+    )
+    if largest > PROFILE_TOKEN_ADVISORY:
         return Check("Interest profile", "warn", f"{detail}. That is large: a shorter profile is cheaper and can decide better")
     return Check("Interest profile", "ok", detail)
 

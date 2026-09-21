@@ -329,7 +329,8 @@ def test_web_explains_how_to_install_the_extras_when_they_are_missing(tmp_path, 
 
 # ---------- Jev at Stage 1 ----------
 
-from test_jev_triage import PROFILE_TOML, FakeJev  # noqa: E402
+from jevfakes import V2_PROFILE_TOML as PROFILE_TOML  # noqa: E402
+from jevfakes import SyntheticJev  # noqa: E402
 
 
 def _jev_setup(tmp_path, monkeypatch, *, key=True, profile=True, jev=None):
@@ -339,7 +340,7 @@ def _jev_setup(tmp_path, monkeypatch, *, key=True, profile=True, jev=None):
     profile_path = tmp_path / "interests.toml"
     if profile:
         profile_path.write_text(PROFILE_TOML, encoding="utf-8")
-    fake = jev or FakeJev()
+    fake = jev or SyntheticJev()
 
     def make_jev(client):
         if not key:
@@ -360,7 +361,7 @@ def test_triage_jev_runs_jev_at_stage_one_and_the_llm_only_as_editor(tmp_path, m
     result = runner.invoke(app, ["--db", str(db), "--profile", str(profile_path), "--triage", "jev"])
     assert result.exit_code == 0, result.output
     assert "Triage: Jev" in result.output and "Worth knowing" in result.output
-    assert len(fake.calls) == 5 and {c["schema_name"] for c in llm.calls} == {"editor_picks"}
+    assert len(fake.calls) == 5 * 4 and {c["schema_name"] for c in llm.calls} == {"editor_picks"}  # four Jev requests per item
     models = {r[0] for r in connect(db).execute("SELECT model FROM enrichments")}
     assert models == {"jev-1.13.0"}
 
@@ -389,7 +390,7 @@ def test_an_invalid_profile_is_an_error_not_a_silent_fallback(tmp_path, monkeypa
 def test_auto_uses_jev_when_a_key_and_a_profile_exist(tmp_path, monkeypatch):
     profile_path, fake, _ = _jev_setup(tmp_path, monkeypatch)
     result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "auto"])
-    assert result.exit_code == 0 and "Triage: Jev" in result.output and len(fake.calls) == 5
+    assert result.exit_code == 0 and "Triage: Jev" in result.output and len(fake.calls) == 5 * 4
 
 
 def test_auto_falls_back_to_the_llm_and_says_why_when_jev_is_not_configured(tmp_path, monkeypatch):
@@ -417,3 +418,30 @@ def test_enrich_with_jev_shows_relevance_scores(tmp_path, monkeypatch):
     result = runner.invoke(app, ["--db", str(db), "--profile", str(profile_path), "--triage", "jev", "enrich"])
     assert result.exit_code == 0, result.output
     assert "Enriched 1" in result.output and "rel " in result.output and "hn item 1" in result.output
+
+
+def test_a_profile_the_current_jev_design_cannot_use_is_an_error_with_a_reason_not_a_silent_fallback(tmp_path, monkeypatch):
+    profile_path, fake, _ = _jev_setup(tmp_path, monkeypatch)
+    profile_path.write_text('[low_value_information]\nusually_low_value = ["x"]\n', encoding="utf-8")
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "jev"])
+    assert result.exit_code == 1 and "priority tiers" in result.output and fake.calls == []
+
+
+def test_the_run_says_which_question_set_it_used(tmp_path, monkeypatch):
+    profile_path, _, _ = _jev_setup(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "jev"])
+    assert "jev-triage-v2" in result.output
+
+
+def test_a_pinned_jev_model_is_passed_to_the_client(monkeypatch):
+    import httpx
+
+    import pia.cli
+
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("JEV_MODEL", "jev-1.13.0")
+    with httpx.Client() as http:
+        assert pia.cli.make_jev(http)._model == "jev-1.13.0"
+    monkeypatch.delenv("JEV_MODEL")
+    with httpx.Client() as http:
+        assert pia.cli.make_jev(http)._model == "jev-latest"

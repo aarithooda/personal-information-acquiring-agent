@@ -2,7 +2,7 @@
 
 One source of truth, several renderings (a design rule from the Jev investigation):
   * `jev_state()`  a trimmed JSON object for Jev's `state`. Jev's docs warn that accuracy falls as unrelated
-                   detail grows ("context rot"), and the profile is sent with EVERY item, so anything that does not
+                   detail grows ("context rot"), and the parts of the profile a question points at are sent with EVERY item, so anything that does not
                    help a relevance decision is left out: personal identifiers, prose about character, current
                    projects, and the learning-style section.
   * `llm_text()`   readable text for the editor prompt (the Stage 2 model writes "why it matters to you", so it gets

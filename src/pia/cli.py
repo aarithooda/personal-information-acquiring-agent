@@ -16,12 +16,13 @@ from rich.markdown import Markdown
 
 from pia.briefing.curate import EnrichmentFailed, make_curator
 from pia.collect import collect
-from pia.config import DEFAULT_DB, DEFAULT_PROFILE, DEFAULT_SOURCES, ConfigError, get_groq_api_key, get_jev_api_key
+from pia.config import DEFAULT_DB, DEFAULT_PROFILE, DEFAULT_SOURCES, ConfigError, get_groq_api_key, get_jev_api_key, get_jev_model
 from pia.db import connect
 from pia.doctor import run_checks
 from pia.history import DatabaseMissing, connect_readonly, default_briefing_id, get_briefing, list_briefings
 from pia.http import USER_AGENT
-from pia.jev.client import JevClient
+from pia.jev.client import DEFAULT_MODEL, JevClient
+from pia.jev.design import CURRENT_DESIGN
 from pia.jev.triage import make_jev_triage
 from pia.llm.client import LLM, GroqClient
 from pia.llm.enrich import enrich_pending
@@ -114,7 +115,7 @@ def make_llm(client: httpx.Client) -> LLM:
 
 
 def make_jev(client: httpx.Client) -> JevClient:
-    return JevClient(get_jev_api_key(), client)
+    return JevClient(get_jev_api_key(), client, model=get_jev_model() or DEFAULT_MODEL)
 
 
 def _stage1(settings: Settings, client: httpx.Client, llm: LLM) -> tuple[Callable | None, Profile | None, str]:
@@ -135,7 +136,7 @@ def _stage1(settings: Settings, client: httpx.Client, llm: LLM) -> tuple[Callabl
         return None, None, f"Triage: LLM (gpt-oss-20b). Jev has a key but there is no interest profile at {settings.profile}."
     profile = load_profile(settings.profile)  # ProfileError: missing (in jev mode) or invalid
     step = make_jev_triage(jev, profile, fallback_llm=llm)
-    return step, profile, f"Triage: Jev + your interest profile ({profile.hash}); editor: gpt-oss-120b with the same profile."
+    return step, profile, f"Triage: Jev ({CURRENT_DESIGN.version}) + your interest profile ({profile.hash}); editor: gpt-oss-120b with the same profile."
 
 
 @app.command("collect")
