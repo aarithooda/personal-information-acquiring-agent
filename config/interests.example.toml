@@ -1,0 +1,50 @@
+# Example interest profile for PIA. Copy this file to config/interests.toml and edit it.
+# config/interests.toml is git-ignored because it describes you personally; this example is committed.
+#
+# The loader (src/pia/profile.py) understands these sections. Every section is optional, but a profile with
+# none of them is rejected. Keep the whole file short: it is sent to the triage model with EVERY item, and a
+# long profile costs tokens and can make a small decision model less accurate ("context rot").
+# Write short, concrete phrases (situations, not adjectives).
+
+[profile]                      # NOT sent to the triage model (only user_stage / core_orientation go to the editor)
+name = "EXAMPLE_READER"
+user_stage = "Software engineer learning modern AI engineering."
+core_orientation = "Understand difficult ideas deeply and use them to build useful systems."
+
+[core_interest_areas]
+
+[[core_interest_areas.area]]
+name = "AI agents and LLM systems"
+priority = "very_high"
+specific_subtopics = ["agent architectures", "tool use", "model evaluation", "local inference"]
+especially_interesting = ["New techniques that improve reliability or efficiency", "Open-source capabilities that used to need big systems"]
+
+[[core_interest_areas.area]]
+name = "Mathematics"
+priority = "high"
+specific_subtopics = ["linear algebra", "proofs", "mathematics relevant to algorithms and AI"]
+especially_interesting = ["Elegant proofs", "Unexpected connections between areas"]
+
+[high_value_information]
+strongest_signals = ["Genuinely new technical capability", "Deep or counterintuitive result", "Open-source project with real practical utility"]
+additional_signals = ["Clear technical substance rather than marketing", "Reproducible results"]
+
+[low_value_information]
+usually_low_value = ["Routine product announcements", "Marketing-heavy announcements without evidence", "Generic technology news"]
+exceptions = ["A routine release becomes relevant if it materially changes architecture, performance or what a developer can build."]
+
+[discovery]
+strong_wildcards = ["Unexpected connections between mathematics and computation", "New computing paradigms"]
+wildcard_threshold = "Surface an outside-domain item only when its novelty, depth or impact is unusually high."
+
+[priority_hierarchy]
+tier_1 = ["AI engineering", "Mathematics"]
+tier_2 = ["Research and scientific discovery"]
+tier_3 = ["Broader technology developments"]
+
+[relevance_guidance]
+primary_question = "Would this make the reader more capable, better informed about an important development, or able to build something meaningfully better?"
+strong_relevance_if = ["It advances a Tier 1 area substantially.", "It contains a deep idea."]
+weak_relevance_if = ["It is merely adjacent to an interest without technical substance.", "It is primarily marketing."]
+do_not_overfilter = ["Do not reduce relevance to keywords.", "Do not require immediate practical utility."]
+final_rule = "Favor substantive, consequential, buildable or genuinely surprising developments. Keep a high threshold for noise."

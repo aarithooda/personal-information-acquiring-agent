@@ -333,3 +333,60 @@ tested without a browser. Static rules (no `innerHTML`, no inline code, valid sy
 mutation check (four deliberate breakages, all caught) was used to show the tests are real. Known limits: the UI
 depends on the renderer's layout (contract-tested, raw-text fallback), Library ordering within a briefing is by
 importance because headline rank is not stored, and there is no "Check now" (D8).
+
+## Jev at Stage 1 (decision model + interest profile)
+
+Change requested 2026-09-21: keep the architecture (collect -> triage -> rank -> shortlist -> editor -> commit) and
+swap what runs inside Stage 1. Jev (a "System One" decision model) triages every new item cheaply against the reader's
+TOML interest profile; the stronger Groq model (`gpt-oss-120b`) stays the editor and now reads the same profile.
+
+**Core-change budget.** New: `profile.py`, `jev/client.py`, `jev/triage.py`. Small edits: `db.py` (migration v4, three
+nullable columns on `enrichments`), `state.py` (`save_enrichments`/`enriched_items` carry the new columns), `rank.py`
+(uses continuous `relevance` when present), `http.py` (`SourceError.status`), `config.py` (Jev key lookup),
+`llm/prompts.py` + `llm/headlines.py` (profile-aware editor prompt, identical without a profile), `briefing/curate.py`
+(optional `triage` and `profile` parameters), `cli.py` and `doctor.py` (options and checks). With neither a Jev key nor
+a profile, behaviour is exactly what it was (`--triage llm` and `auto` without a key).
+
+| # | Decision | Alternatives | Why / trade-off | Concept |
+|---|---|---|---|---|
+| J1 | Nine atomic typed questions per item (2 Score, 6 Noul, 1 Choice), combined in code | One "worth showing?" Noul | Jev's docs say one proposition per question; a compound subjective question is exactly what a literal decision model is worst at. More requests-worth of tokens, still under a cent per run. | Decompose judgments, combine in code |
+| J2 | Store the RAW answers (`details` JSON) + `profile_hash`; `derive()` works from the stored form | Store only the final score | The weights are version 0 and unvalidated; with raw answers they can change with zero new API calls (tested). | Raw vs derived data |
+| J3 | Plain httpx client over our retry layer, not the vendor SDK | `typesafe-sdk` | One JSON endpoint; SDK adds a dependency (and its own HTTP stack) without capability. Typed models validate every response. | An LLM/model call is an HTTP POST |
+| J4 | One request per item, 4 in flight, backpressure, results saved as they arrive, all SQLite writes on the main thread | Submit everything to the pool | Found by a test: submitting all requests up front let an outage burn the whole backlog before the circuit breaker could react. Bounded in-flight work fixes it. | Backpressure |
+| J5 | Errors reuse the LLM taxonomy: 400/422 = `LLMBadOutput` (may be this item), everything else = `LLMUnavailable`; `SourceError.status` makes the difference visible | Treat all as one error | Same attempts-counting and circuit-breaker logic as the LLM triage; an outage is never held against an item. | Error taxonomy |
+| J6 | Fallback: if Jev stops responding, the LLM triage finishes the remaining items | Fail the run | Graceful degradation as everywhere else in PIA. Mixed rows rank together (importance vs 1+4 x relevance). | Graceful degradation |
+| J7 | Profile: TOML source of truth; `jev_state()` (trimmed) for Jev, `llm_text()` for the editor; content hash stored with results; git-ignored, example committed | Markdown/JSON/YAML | Human-editable with comments, stdlib parser; Jev warns of "context rot", so personal fields and prose are not sent to it. Measured: the trimmed profile is still ~4k tokens, 40x a typical item. | One source, several renderings |
+| J8 | Popularity signals are NOT sent to Jev | Send them | The ranker already handles popularity (per-source percentiles); keeping it out avoids rewarding "popular but unrelated". | Separation of concerns |
+| J9 | `--triage auto\|jev\|llm`; `jev` is strict, `auto` degrades with a printed reason; an invalid profile is always an error | Silent fallback | Silently doing something else after being asked for Jev would mislead; ignoring a file the reader wrote would hide their mistake. | Fail loudly on explicit intent |
+
+**What the real API taught us (a spike before any tests were written).** Response format matched the docs exactly;
+`GET /v1/models` exists (used by `doctor --online`, sends no item data); latency about 430 ms per request (1.3 s cold);
+about 4.4k input tokens per request, dominated by the profile. And: the first wording of the injection question
+("tries to give instructions to whoever processes it") scored 0.74 on the plain imperative title "Exfiltrate Your
+Weights". It was reworded to target text aimed at a model and is only acted on at 0.90+; measured 0.37 on that title
+and 0.99 on a synthetic "ignore all previous instructions" item (which also scored ~0 on every other question).
+
+**First real run** (copy of the real database, 186 items, 5 days away => 7 headlines, shortlist 16, real Jev + real
+Groq editor): 34 s end to end including collection, no warnings or retries. Jev: 820,795 input tokens = **$0.0345**
+for all 186 items ($0.00019/item). Relevance median 0.32, max 0.81; injection flags 0 (no false positives);
+category agreement with the old Stage 1 77%, rank correlation 0.71. The formula's ceiling is about 0.85, so
+importance 5 is never produced (ranking uses the continuous relevance, so this only affects the integer column).
+
+**Findings and open questions (not yet acted on):**
+1. **Title-only items are penalised.** Mean relevance 0.23 for the 113 title-only items vs 0.58 for the 73 with text;
+   Hacker News averages 0.22, arXiv 0.68. Little text means little "substance" evidence, so an evidence-availability
+   bias enters the score. Concrete misses by the profile's own standard: "One-Electron Universe" (0.37) and "I vibed a
+   proof of Conway's conjecture" (0.35). `too_little_info` separates the groups only weakly (0.79 vs 0.64).
+   Options: score title-only items on topical match alone and renormalise; use `too_little_info` to shrink toward a
+   neutral prior; or fetch article text (see "Future consideration: article text").
+2. **Top-K shortlists are homogeneous.** 20 of 21 shown items are AI; the Quanta mathematics story (0.73) was skipped.
+   The profile's `discovery` section asks to avoid an echo chamber, but the editor only sees the shortlist. Options: a
+   reserved "discovery lane" (top items by wildcard x substance outside the top K), or per-category quotas / MMR.
+3. **Hype repos.** Items about Jev itself average 0.49 vs 0.35 for the rest (9 of 16 at 0.5+; three GitHub repos at
+   0.74-0.77) despite the profile saying not to surface items merely for containing AI terms. Whether that is
+   description-level keyword matching or a self-reference effect cannot be separated without labelled data.
+4. **The weights are unvalidated.** The benchmark from the Jev investigation (human labels, an A1 arm = the current LLM
+   with the same profile, recall@K, calibration) is still the way to tune them and to test whether the profile, not the
+   model, is doing most of the work.
+5. **Profile size.** ~4k tokens per request against ~100-token items; an ablation with a shorter profile is cheap.
+6. Extras are now bare links (Jev writes no summaries); the editor only writes explanations for headlines.

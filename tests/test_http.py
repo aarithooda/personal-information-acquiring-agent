@@ -103,3 +103,17 @@ def test_retries_network_errors():
     resp = get_with_retry(make_client(script), "https://x.test", sleep=script.sleep)
     assert resp.text == "ok"
     assert script.calls == 2
+
+
+def test_source_errors_carry_the_http_status_so_callers_can_tell_why_a_request_failed():
+    from pia.http import SourceError as Err
+
+    with pytest.raises(Err) as rejected:
+        get_with_retry(make_client(Script(httpx.Response(422))), "https://x.test", sleep=lambda s: None)
+    assert rejected.value.status == 422
+    with pytest.raises(Err) as exhausted:
+        get_with_retry(make_client(Script(httpx.Response(529))), "https://x.test", retries=1, sleep=lambda s: None)
+    assert exhausted.value.status == 529
+    with pytest.raises(Err) as network:
+        get_with_retry(make_client(Script(httpx.ConnectError("boom"))), "https://x.test", retries=0, sleep=lambda s: None)
+    assert network.value.status is None  # no response at all

@@ -5,6 +5,7 @@ Two different questions, deliberately answered by two different tables:
   * "What has the *user* already been shown?"      -> briefings (checkpoint) + items.briefing_id
 """
 
+import json
 import sqlite3
 from datetime import datetime
 
@@ -102,7 +103,7 @@ def enriched_items(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     enrichment wins, so changing PROMPT_VERSION never strands items triaged under the old one.
     """
     return conn.execute(
-        """SELECT i.*, e.category, e.importance, e.summary
+        """SELECT i.*, e.category, e.importance, e.summary, e.relevance
            FROM items i
            JOIN enrichments e ON e.item_id = i.id
             AND e.rowid = (SELECT MAX(rowid) FROM enrichments WHERE item_id = i.id)
@@ -132,18 +133,33 @@ def save_enrichments(
     model: str,
     prompt_version: str,
     now: datetime,
+    profile_hash: str | None = None,
 ) -> None:
     """Persist one batch of triage results and mark those items enriched, atomically.
 
-    `results` maps item id -> an object with category / importance / summary.
+    `results` maps item id -> an object with category / importance / summary, and optionally (Jev)
+    relevance (float) and details (a dict of raw answers, stored as JSON).
     """
     with conn:
         for item_id, result in results.items():
+            details = getattr(result, "details", None)
             conn.execute(
                 """INSERT OR REPLACE INTO enrichments
-                   (item_id, model, prompt_version, category, importance, summary, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (item_id, model, prompt_version, result.category, result.importance, result.summary, _iso(now)),
+                   (item_id, model, prompt_version, category, importance, summary, created_at,
+                    relevance, details, profile_hash)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    item_id,
+                    model,
+                    prompt_version,
+                    result.category,
+                    result.importance,
+                    result.summary,
+                    _iso(now),
+                    getattr(result, "relevance", None),
+                    json.dumps(details, sort_keys=True) if details is not None else None,
+                    profile_hash,
+                ),
             )
             conn.execute("UPDATE items SET status = 'enriched' WHERE id = ? AND status = 'discovered'", (item_id,))
 

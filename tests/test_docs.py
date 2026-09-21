@@ -41,3 +41,9 @@ def test_the_readme_points_at_the_launcher_and_the_design_notes():
 def test_the_readme_is_honest_that_article_fetching_is_not_built():
     text = readme_text().lower()
     assert "article" in text and "not implemented" in text
+
+
+def test_the_readme_documents_the_jev_setup_and_privacy_of_the_profile():
+    text = readme_text()
+    for needed in ("TYPESAFE_API_KEY", "config/interests.toml", "--triage", "interests.example.toml", "Sent to Jev"):
+        assert needed in text, needed

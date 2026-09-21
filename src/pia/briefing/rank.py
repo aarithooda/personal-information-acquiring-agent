@@ -1,6 +1,6 @@
 """Deterministic ranking of triaged items.
 
-score = LLM importance (1-5)
+score = model judgment (1-5: LLM importance, or 1 + 4 x Jev relevance)
       + popularity percentile (0-1): how the item's best signal compares with the *other
         items from that same source in this window*, so there are no magic thresholds
       + cross-source boost (0-1): being reported by several independent sources
@@ -21,6 +21,15 @@ def _metric(signals: dict, source: str) -> float | None:
     data = signals.get(source)
     value = data.get(POPULARITY_METRICS[source]) if isinstance(data, dict) else None
     return value if isinstance(value, (int, float)) else None
+
+
+def _base(row: sqlite3.Row) -> float:
+    """The model's judgment on the same 1-5 scale. A decision model (Jev) supplies a continuous `relevance` in
+    [0, 1], which keeps its resolution (many items share an integer importance); LLM triage supplies only the
+    integer. Rows from either can be ranked together, and rows from older databases have no relevance column."""
+    if "relevance" in row.keys() and row["relevance"] is not None:
+        return 1 + 4 * row["relevance"]
+    return row["importance"]
 
 
 def rank_items(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
@@ -44,7 +53,7 @@ def rank_items(rows: list[sqlite3.Row]) -> list[sqlite3.Row]:
             default=0.0,
         )
         boost = min(1.0, CROSS_SOURCE_BOOST * (len(sig) - 1)) if sig else 0.0
-        return row["importance"] + popularity + boost
+        return _base(row) + popularity + boost
 
     scored = [(score(row, sig), row) for row, sig in zip(rows, signals)]
     recency = lambda pair: pair[1]["published_at"] or pair[1]["discovered_at"]  # noqa: E731

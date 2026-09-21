@@ -325,3 +325,95 @@ def test_web_explains_how_to_install_the_extras_when_they_are_missing(tmp_path, 
     monkeypatch.setattr(pia.cli, "_load_web", missing)
     result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "web"])
     assert result.exit_code == 1 and 'pip install -e ".[web]"' in result.output
+
+
+# ---------- Jev at Stage 1 ----------
+
+from test_jev_triage import PROFILE_TOML, FakeJev  # noqa: E402
+
+
+def _jev_setup(tmp_path, monkeypatch, *, key=True, profile=True, jev=None):
+    import pia.cli
+    from fakes import SmartLLM
+
+    profile_path = tmp_path / "interests.toml"
+    if profile:
+        profile_path.write_text(PROFILE_TOML, encoding="utf-8")
+    fake = jev or FakeJev()
+
+    def make_jev(client):
+        if not key:
+            raise pia.cli.ConfigError("TYPESAFE_API_KEY (or JEV_API_KEY) not found.")
+        return fake
+
+    llm = SmartLLM()
+    source = FakeSource("hn", [make_item("hn", n, T0, content="Text") for n in range(5)])
+    monkeypatch.setattr(pia.cli, "make_jev", make_jev)
+    monkeypatch.setattr(pia.cli, "make_llm", lambda client: llm)
+    monkeypatch.setattr(pia.cli, "load_sources", lambda path: [source])
+    return profile_path, fake, llm
+
+
+def test_triage_jev_runs_jev_at_stage_one_and_the_llm_only_as_editor(tmp_path, monkeypatch):
+    profile_path, fake, llm = _jev_setup(tmp_path, monkeypatch)
+    db = tmp_path / "pia.db"
+    result = runner.invoke(app, ["--db", str(db), "--profile", str(profile_path), "--triage", "jev"])
+    assert result.exit_code == 0, result.output
+    assert "Triage: Jev" in result.output and "Worth knowing" in result.output
+    assert len(fake.calls) == 5 and {c["schema_name"] for c in llm.calls} == {"editor_picks"}
+    models = {r[0] for r in connect(db).execute("SELECT model FROM enrichments")}
+    assert models == {"jev-1.13.0"}
+
+
+def test_triage_jev_without_a_key_fails_loudly_and_records_nothing(tmp_path, monkeypatch):
+    profile_path, _, _ = _jev_setup(tmp_path, monkeypatch, key=False)
+    db = tmp_path / "pia.db"
+    result = runner.invoke(app, ["--db", str(db), "--profile", str(profile_path), "--triage", "jev"])
+    assert result.exit_code == 1 and "TYPESAFE_API_KEY" in result.output
+    assert connect(db).execute("SELECT COUNT(*) FROM briefings").fetchone()[0] == 0
+
+
+def test_triage_jev_without_a_profile_says_how_to_create_one(tmp_path, monkeypatch):
+    profile_path, _, _ = _jev_setup(tmp_path, monkeypatch, profile=False)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "jev"])
+    assert result.exit_code == 1 and "interests.example.toml" in result.output
+
+
+def test_an_invalid_profile_is_an_error_not_a_silent_fallback(tmp_path, monkeypatch):
+    profile_path, _, _ = _jev_setup(tmp_path, monkeypatch)
+    profile_path.write_text("not = = toml", encoding="utf-8")
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "auto"])
+    assert result.exit_code == 1 and "not valid TOML" in result.output
+
+
+def test_auto_uses_jev_when_a_key_and_a_profile_exist(tmp_path, monkeypatch):
+    profile_path, fake, _ = _jev_setup(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "auto"])
+    assert result.exit_code == 0 and "Triage: Jev" in result.output and len(fake.calls) == 5
+
+
+def test_auto_falls_back_to_the_llm_and_says_why_when_jev_is_not_configured(tmp_path, monkeypatch):
+    profile_path, fake, llm = _jev_setup(tmp_path, monkeypatch, key=False)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "auto"])
+    assert result.exit_code == 0 and "Jev is not configured" in result.output
+    assert fake.calls == [] and "triage_results" in {c["schema_name"] for c in llm.calls}
+
+
+def test_triage_llm_is_exactly_the_previous_behaviour(tmp_path, monkeypatch):
+    profile_path, fake, llm = _jev_setup(tmp_path, monkeypatch)
+    result = runner.invoke(app, ["--db", str(tmp_path / "pia.db"), "--profile", str(profile_path), "--triage", "llm"])
+    assert result.exit_code == 0 and fake.calls == []
+    assert "READER PROFILE" not in [c for c in llm.calls if c["schema_name"] == "editor_picks"][0]["system"]
+
+
+def test_enrich_with_jev_shows_relevance_scores(tmp_path, monkeypatch):
+    from pia.db import store_items
+
+    profile_path, fake, _ = _jev_setup(tmp_path, monkeypatch)
+    db = tmp_path / "pia.db"
+    conn = connect(db)
+    store_items(conn, [make_item("hn", 1, T0, content="Details.")], now=T0)
+    conn.close()
+    result = runner.invoke(app, ["--db", str(db), "--profile", str(profile_path), "--triage", "jev", "enrich"])
+    assert result.exit_code == 0, result.output
+    assert "Enriched 1" in result.output and "rel " in result.output and "hn item 1" in result.output

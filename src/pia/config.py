@@ -11,6 +11,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DB = PROJECT_ROOT / "data" / "pia.db"
 DEFAULT_SOURCES = PROJECT_ROOT / "config" / "sources.toml"
+DEFAULT_PROFILE = PROJECT_ROOT / "config" / "interests.toml"  # the reader's interests (git-ignored, personal)
 
 # Files searched for secrets, in order. ".env.txt" is there because Windows Notepad
 # quietly appends ".txt" when you save a file named ".env".
@@ -40,22 +41,47 @@ def _parse_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-def find_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> tuple[str, str]:
-    """Returns (key, where it came from). The real environment wins; otherwise the first
-    .env file that has a non-empty value."""
-    if environ.get("GROQ_API_KEY"):
-        return environ["GROQ_API_KEY"], "environment variable"
-    for name in ENV_FILES:
-        path = root / name
+def _find_key(names: tuple[str, ...], root: Path, environ: Mapping[str, str], missing_hint: str) -> tuple[str, str]:
+    """Returns (key, where it came from). The real environment wins; otherwise the first .env file that
+    has a non-empty value. `names` are tried in order, so the first one is the preferred spelling."""
+    for name in names:
+        if environ.get(name):
+            return environ[name], "environment variable"
+    for file_name in ENV_FILES:
+        path = root / file_name
         if path.is_file():
-            value = _parse_env_file(path).get("GROQ_API_KEY")
-            if value:
-                return value, name
-    raise ConfigError(
-        f"GROQ_API_KEY not found. Put a line 'GROQ_API_KEY=your_key' in {root / '.env'} "
-        "(or set the environment variable)."
+            values = _parse_env_file(path)
+            for name in names:
+                if values.get(name):
+                    return values[name], file_name
+    raise ConfigError(missing_hint)
+
+
+def find_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> tuple[str, str]:
+    return _find_key(
+        ("GROQ_API_KEY",),
+        root,
+        environ,
+        f"GROQ_API_KEY not found. Put a line 'GROQ_API_KEY=your_key' in {root / '.env'} (or set the environment variable).",
     )
 
 
 def get_groq_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str:
     return find_groq_api_key(root, environ)[0]
+
+
+# TypeSafe's documentation calls the variable TYPESAFE_API_KEY; JEV_API_KEY is accepted as an alias.
+JEV_KEY_NAMES = ("TYPESAFE_API_KEY", "JEV_API_KEY")
+
+
+def find_jev_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> tuple[str, str]:
+    return _find_key(
+        JEV_KEY_NAMES,
+        root,
+        environ,
+        f"TYPESAFE_API_KEY (or JEV_API_KEY) not found. Put a line 'TYPESAFE_API_KEY=your_key' in {root / '.env'}.",
+    )
+
+
+def get_jev_api_key(root: Path = PROJECT_ROOT, environ: Mapping[str, str] = os.environ) -> str:
+    return find_jev_api_key(root, environ)[0]

@@ -4,6 +4,7 @@ import logging
 import sys
 import threading
 import webbrowser
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,24 +16,32 @@ from rich.markdown import Markdown
 
 from pia.briefing.curate import EnrichmentFailed, make_curator
 from pia.collect import collect
-from pia.config import DEFAULT_DB, DEFAULT_SOURCES, ConfigError, get_groq_api_key
+from pia.config import DEFAULT_DB, DEFAULT_PROFILE, DEFAULT_SOURCES, ConfigError, get_groq_api_key, get_jev_api_key
 from pia.db import connect
 from pia.doctor import run_checks
 from pia.history import DatabaseMissing, connect_readonly, default_briefing_id, get_briefing, list_briefings
 from pia.http import USER_AGENT
+from pia.jev.client import JevClient
+from pia.jev.triage import make_jev_triage
 from pia.llm.client import LLM, GroqClient
 from pia.llm.enrich import enrich_pending
 from pia.pipeline import AllSourcesFailed, run_briefing
+from pia.profile import Profile, ProfileError, load_profile
 from pia.sources.registry import load_sources
 from pia.state import enriched_items, get_checkpoint, last_fetch_runs, pending_items
 
 app = typer.Typer(add_completion=False, help="Personal Intelligence Agent: what happened since I last checked?")
 
 
+TRIAGE_MODES = ("auto", "jev", "llm")
+
+
 @dataclass
 class Settings:
     db: Path
     config: Path
+    profile: Path
+    triage: str
 
 
 def ensure_utf8_output() -> None:
@@ -48,12 +57,21 @@ def main(
     ctx: typer.Context,
     db: Path = typer.Option(DEFAULT_DB, help="SQLite database file."),
     config: Path = typer.Option(DEFAULT_SOURCES, help="Sources config file."),
+    profile: Path = typer.Option(DEFAULT_PROFILE, help="Your interest profile (TOML)."),
+    triage: str = typer.Option(
+        "auto",
+        "--triage",
+        envvar="PIA_TRIAGE",
+        help="Stage 1: jev (decision model + your profile), llm (gpt-oss), or auto (Jev if a key and a profile exist).",
+    ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show warnings and retries."),
 ) -> None:
     """With no subcommand: fetch what's new and show your briefing."""
     ensure_utf8_output()
     logging.basicConfig(level=logging.INFO if verbose else logging.ERROR, format="%(levelname)s %(message)s")
-    ctx.obj = Settings(db, config)
+    if triage not in TRIAGE_MODES:
+        raise typer.BadParameter(f"must be one of {', '.join(TRIAGE_MODES)}", param_hint="--triage")
+    ctx.obj = Settings(db, config, profile, triage)
     if ctx.invoked_subcommand is None:
         _briefing(ctx.obj)
 
@@ -69,9 +87,15 @@ def _briefing(settings: Settings) -> None:
         except ConfigError as exc:
             console.print(f"[red]{exc}[/red]")
             raise typer.Exit(1)
+        try:
+            triage, profile, note = _stage1(settings, client, llm)
+        except (ConfigError, ProfileError) as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(1)
+        console.print(f"[dim]{note}[/dim]")
         with console.status("Checking sources and reading what's new..."):
             try:
-                result = run_briefing(conn, client, sources, now, prepare=make_curator(llm))
+                result = run_briefing(conn, client, sources, now, prepare=make_curator(llm, triage=triage, profile=profile))
             except AllSourcesFailed as exc:
                 console.print(f"[red]Could not reach any source, so nothing was recorded.[/red]\n{exc}")
                 raise typer.Exit(1)
@@ -87,6 +111,31 @@ def _http_client() -> httpx.Client:
 
 def make_llm(client: httpx.Client) -> LLM:
     return GroqClient(get_groq_api_key(), client)
+
+
+def make_jev(client: httpx.Client) -> JevClient:
+    return JevClient(get_jev_api_key(), client)
+
+
+def _stage1(settings: Settings, client: httpx.Client, llm: LLM) -> tuple[Callable | None, Profile | None, str]:
+    """Choose Stage 1. Returns (triage step, profile, one-line description). A step of None means the default LLM triage.
+
+    `jev` is strict: a missing key or profile is an error, because silently doing something else after being asked
+    for Jev would be misleading. `auto` uses Jev only when both exist and says why when it does not. In every mode an
+    INVALID profile is an error: quietly ignoring a file the reader wrote would hide their mistake."""
+    if settings.triage == "llm":
+        return None, None, "Triage: LLM (gpt-oss-20b), no profile."
+    try:
+        jev = make_jev(client)
+    except ConfigError:
+        if settings.triage == "jev":
+            raise
+        return None, None, "Triage: LLM (gpt-oss-20b). Jev is not configured (add TYPESAFE_API_KEY to use it)."
+    if settings.triage == "auto" and not settings.profile.is_file():
+        return None, None, f"Triage: LLM (gpt-oss-20b). Jev has a key but there is no interest profile at {settings.profile}."
+    profile = load_profile(settings.profile)  # ProfileError: missing (in jev mode) or invalid
+    step = make_jev_triage(jev, profile, fallback_llm=llm)
+    return step, profile, f"Triage: Jev + your interest profile ({profile.hash}); editor: gpt-oss-120b with the same profile."
 
 
 @app.command("collect")
@@ -113,12 +162,20 @@ def enrich(
         except ConfigError as exc:
             typer.echo(str(exc), err=True)
             raise typer.Exit(1)
-        report = enrich_pending(conn, llm, datetime.now(timezone.utc), limit=limit)
+        try:
+            triage, _, note = _stage1(ctx.obj, client, llm)
+        except (ConfigError, ProfileError) as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1)
+        typer.echo(note)
+        now = datetime.now(timezone.utc)
+        report = triage(conn, now, limit=limit) if triage else enrich_pending(conn, llm, now, limit=limit)
 
     typer.echo(f"Enriched {report.enriched}; {report.remaining} still pending"
                + (" (stopped early after repeated failures)" if report.stopped_early else ""))
     for row in enriched_items(conn):
-        typer.echo(f"  {row['importance']} {row['category']:<9} {row['summary']}  [{row['source']}: {row['title'][:60]}]")
+        relevance = f"rel {row['relevance']:.2f}" if row["relevance"] is not None else " " * 8
+        typer.echo(f"  {row['importance']} {row['category']:<9} {relevance}  {row['summary']}  [{row['source']}: {row['title'][:60]}]")
 
 
 @app.command()
@@ -190,7 +247,7 @@ def doctor(
     online: bool = typer.Option(False, "--online", help="Also test the network: each source and your Groq key."),
 ) -> None:
     """Check that everything is set up correctly. Changes nothing; never prints your API key."""
-    kwargs = dict(db_path=ctx.obj.db, config_path=ctx.obj.config, online=online)
+    kwargs = dict(db_path=ctx.obj.db, config_path=ctx.obj.config, online=online, profile_path=ctx.obj.profile)
     if online:
         with _http_client() as client:
             checks = run_checks(**kwargs, client=client)

@@ -48,3 +48,10 @@ def nothing_leaves_this_machine(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", guarded_connect)
     monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
     monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)
+
+
+@pytest.fixture(autouse=True)
+def default_to_llm_triage(monkeypatch):
+    """`pia` chooses Jev automatically when a key and a profile exist. Tests must never depend on the developer's
+    real files, so they default to the LLM triage; Jev tests ask for it explicitly with --triage jev."""
+    monkeypatch.setenv("PIA_TRIAGE", "llm")

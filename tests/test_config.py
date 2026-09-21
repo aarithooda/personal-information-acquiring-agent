@@ -55,3 +55,39 @@ def test_find_reports_where_the_key_came_from_without_exposing_it(tmp_path):
     assert find_groq_api_key(root=tmp_path, environ={}) == (KEY, ".env.txt")
     (tmp_path / ".env").write_text(f"GROQ_API_KEY={KEY}\n")
     assert find_groq_api_key(root=tmp_path, environ={})[1] == ".env"  # .env takes priority
+
+
+# ---------- Jev key: the docs call the variable TYPESAFE_API_KEY, users may have written JEV_API_KEY ----------
+
+JEV = "jev_test_key_123456"
+
+
+def test_jev_key_is_read_from_either_variable_name_in_a_file(tmp_path):
+    from pia.config import find_jev_api_key
+
+    (tmp_path / ".env.txt").write_text(f"GROQ_API_KEY={KEY}\nJEV_API_KEY={JEV}\n")
+    assert find_jev_api_key(root=tmp_path, environ={}) == (JEV, ".env.txt")
+    (tmp_path / ".env.txt").write_text(f"TYPESAFE_API_KEY={JEV}\n")
+    assert find_jev_api_key(root=tmp_path, environ={}) == (JEV, ".env.txt")
+
+
+def test_the_documented_name_wins_and_the_real_environment_wins_over_files(tmp_path):
+    from pia.config import find_jev_api_key
+
+    (tmp_path / ".env").write_text("JEV_API_KEY=alias_key\nTYPESAFE_API_KEY=official_key\n")
+    assert find_jev_api_key(root=tmp_path, environ={})[0] == "official_key"
+    assert find_jev_api_key(root=tmp_path, environ={"JEV_API_KEY": "from_env"}) == ("from_env", "environment variable")
+
+
+def test_a_missing_jev_key_says_which_names_are_accepted_and_never_echoes_other_secrets(tmp_path):
+    from pia.config import find_jev_api_key
+
+    (tmp_path / ".env").write_text(f"GROQ_API_KEY={KEY}\n")
+    with pytest.raises(ConfigError) as excinfo:
+        find_jev_api_key(root=tmp_path, environ={})
+    assert "TYPESAFE_API_KEY" in str(excinfo.value) and KEY not in str(excinfo.value)
+
+
+def test_groq_lookup_is_unchanged_by_the_refactor(tmp_path):
+    (tmp_path / ".env").write_text(f"JEV_API_KEY={JEV}\nGROQ_API_KEY={KEY}\n")
+    assert get_groq_api_key(root=tmp_path, environ={}) == KEY

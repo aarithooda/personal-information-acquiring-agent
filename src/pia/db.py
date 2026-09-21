@@ -81,6 +81,17 @@ MIGRATIONS = [
         created_at TEXT NOT NULL
     );
     """,
+    # v4: what a decision model (Jev) adds to a triage row. All nullable, so rows written by the LLM triage
+    # (which has none of these) are unchanged.
+    #   relevance    a continuous 0-1 score, finer than the 1-5 integer `importance` derived from it
+    #   details      the RAW answers (probabilities, confidences, token usage) as JSON, so the way they are
+    #                combined can be changed later WITHOUT calling the model again
+    #   profile_hash which interest profile produced the row (like prompt_version, for the reader's profile)
+    """
+    ALTER TABLE enrichments ADD COLUMN relevance REAL;
+    ALTER TABLE enrichments ADD COLUMN details TEXT;
+    ALTER TABLE enrichments ADD COLUMN profile_hash TEXT;
+    """,
 ]
 
 

@@ -1,0 +1,78 @@
+{
+ "model": "jev-1.13.0",
+ "answers": {
+  "interest_match": {
+   "type": "score",
+   "score": 2.88,
+   "confidence": 0.88,
+   "legend": {
+    "0": "Unrelated to every interest area, or only shares a keyword without technical substance",
+    "1": "Adjacent to a lower-priority interest or a wildcard area, without a strong connection",
+    "2": "Clearly within a Tier 2 or Tier 3 area of `reader_profile.priority_hierarchy`, or a moderate match with a Tier 1 area",
+    "3": "Directly advances a Tier 1 area of `reader_profile.priority_hierarchy`"
+   },
+   "probabilities": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.12,
+    "3": 0.88
+   }
+  },
+  "substance": {
+   "type": "score",
+   "score": 2.08,
+   "confidence": 0.91,
+   "legend": {
+    "0": "Marketing, hype, generic news, opinion or personality-driven, with no technical content",
+    "1": "Discusses something technical but reports no concrete new result, method or evidence",
+    "2": "Reports a concrete technical result, tool, release or technique with some evidence or implementation",
+    "3": "A significant new capability, strong empirical or theoretical result, or deep idea that changes technical understanding"
+   },
+   "probabilities": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 0.92,
+    "3": 0.08
+   }
+  },
+  "low_value_pattern": {
+   "type": "noul",
+   "noul": 0.16
+  },
+  "low_value_exception": {
+   "type": "noul",
+   "noul": 0.33
+  },
+  "wildcard": {
+   "type": "noul",
+   "noul": 0.1
+  },
+  "buildable": {
+   "type": "noul",
+   "noul": 0.9
+  },
+  "too_little_info": {
+   "type": "noul",
+   "noul": 0.23
+  },
+  "category": {
+   "type": "choice",
+   "choice": "ai",
+   "confidence": 1.0,
+   "probabilities": {
+    "ai": 1.0,
+    "software": 0.0,
+    "research": 0.0,
+    "other": 0.0
+   }
+  },
+  "injection": {
+   "type": "noul",
+   "noul": 0.06
+  }
+ },
+ "usage": {
+  "input_tokens": 4418,
+  "output_tokens": 183
+ }
+}

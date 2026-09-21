@@ -17,8 +17,8 @@ from pia.llm.prompts import (
     STAGE2_MODEL,
     STAGE2_SCHEMA,
     STAGE2_SCHEMA_NAME,
-    STAGE2_SYSTEM,
     build_stage2_user,
+    stage2_system,
 )
 
 log = logging.getLogger(__name__)
@@ -46,7 +46,12 @@ class _Pick(BaseModel):
 
 
 def select_headlines(
-    llm: LLM, candidates: list[sqlite3.Row], max_count: int, *, model: str = STAGE2_MODEL
+    llm: LLM,
+    candidates: list[sqlite3.Row],
+    max_count: int,
+    *,
+    model: str = STAGE2_MODEL,
+    profile_text: str | None = None,
 ) -> list[Headline]:
     """Raises LLMError if the model call fails or yields nothing usable; callers fall back."""
     if not candidates:
@@ -54,7 +59,7 @@ def select_headlines(
 
     data = llm.complete_json(
         model=model,
-        system=STAGE2_SYSTEM,
+        system=stage2_system(profile_text),
         user=build_stage2_user(candidates, max_count),
         schema_name=STAGE2_SCHEMA_NAME,
         schema=STAGE2_SCHEMA,

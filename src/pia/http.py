@@ -16,7 +16,12 @@ USER_AGENT = "pia-personal-agent/0.1 (personal learning project)"
 
 
 class SourceError(Exception):
-    """A source could not be fetched. Callers treat this as 'skip this source'."""
+    """A request could not be completed. `status` is the HTTP status of the last response, or None if there
+    was none (network failure). Callers use it to tell "the server refused this request" from "the server is down"."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
 
 
 def _retry_delay(response: httpx.Response | None, attempt: int, max_wait: float) -> float:
@@ -48,22 +53,25 @@ def request_with_retry(
     Authorization header cannot leak into logs or tracebacks.
     """
     last_problem = "no attempt made"
+    last_status: int | None = None
     for attempt in range(retries + 1):
         response = None
         try:
             response = client.request(method, url, **request_kwargs)
         except httpx.TransportError as exc:  # timeouts, DNS, connection resets
             last_problem = f"network error: {exc}"
+            last_status = None
         else:
             if response.status_code < 400:
                 return response
             last_problem = f"HTTP {response.status_code}"
+            last_status = response.status_code
             retryable = response.status_code == 429 or response.status_code >= 500
             if not retryable:
-                raise SourceError(f"{url}: {last_problem}")
+                raise SourceError(f"{url}: {last_problem}", status=response.status_code)
 
         if attempt < retries:
             delay = _retry_delay(response, attempt, max_wait)
             log.warning("%s: %s, retrying in %.0fs", url, last_problem, delay)
             sleep(delay)
-    raise SourceError(f"{url}: {last_problem} (gave up after {retries + 1} attempts)")
+    raise SourceError(f"{url}: {last_problem} (gave up after {retries + 1} attempts)", status=last_status)

@@ -6,6 +6,7 @@ list its models (this sends no data and costs nothing). The API key is never pri
 whether it was found, where, and that Groq accepts it.
 """
 
+import json
 import os
 import sqlite3
 import sys
@@ -17,11 +18,13 @@ from typing import Literal
 
 import httpx
 
-from pia.config import PROJECT_ROOT, ConfigError, find_groq_api_key
+from pia.config import PROJECT_ROOT, ConfigError, find_groq_api_key, find_jev_api_key
 from pia.db import MIGRATIONS
 from pia.history import DatabaseMissing, connect_readonly
 from pia.http import SourceError, request_with_retry
-from pia.llm.client import BASE_URL
+from pia.jev.client import JevClient
+from pia.llm.client import BASE_URL, LLMError
+from pia.profile import ProfileError, approx_tokens, load_profile
 from pia.sources.base import Source
 from pia.sources.registry import load_sources
 
@@ -110,6 +113,40 @@ def _check_source_online(source: Source, client: httpx.Client, now: datetime) ->
     return Check(name, "ok", f"reachable ({len(items)} item{'s' if len(items) != 1 else ''} in the last day; not stored)")
 
 
+PROFILE_TOKEN_ADVISORY = 6000  # the profile is sent with every item; beyond this it costs more and may blur the decision
+
+
+def _check_jev_key(found: tuple[str, str] | None) -> Check:
+    if found is None:
+        return Check("Jev API key", "warn", "not configured (TYPESAFE_API_KEY); Jev triage is off and the LLM triage is used")
+    key, origin = found
+    return Check("Jev API key", "ok", f"found in {origin} ({len(key)} characters)")
+
+
+def _check_profile(path: Path | None) -> Check:
+    if path is None or not Path(path).is_file():
+        return Check("Interest profile", "warn", f"none at {path}; Jev triage needs one (copy config/interests.example.toml)")
+    try:
+        profile = load_profile(path)
+    except ProfileError as exc:
+        return Check("Interest profile", "fail", str(exc))
+    jev_tokens = approx_tokens(json.dumps(profile.jev_state(), ensure_ascii=False))
+    editor_tokens = approx_tokens(profile.llm_text())
+    detail = f"hash {profile.hash}; about {jev_tokens} tokens sent to Jev with every item, {editor_tokens} tokens to the editor"
+    if jev_tokens > PROFILE_TOKEN_ADVISORY:
+        return Check("Interest profile", "warn", f"{detail}. That is large: a shorter profile is cheaper and can decide better")
+    return Check("Interest profile", "ok", detail)
+
+
+def _check_jev_online(client: httpx.Client, key: str) -> Check:
+    try:
+        models = JevClient(key, client).list_models()  # sends no item data
+    except LLMError as exc:
+        hint = "the key was rejected; check it at console.typesafe.ai" if "401" in str(exc) or "403" in str(exc) else "could not reach Jev"
+        return Check("Jev API", "fail", f"{hint} ({exc})")
+    return Check("Jev API", "ok", f"reachable and the key is accepted (models: {', '.join(models)})")
+
+
 def run_checks(
     *,
     db_path: Path,
@@ -120,6 +157,7 @@ def run_checks(
     client: httpx.Client | None = None,
     sources: list[Source] | None = None,
     now: datetime | None = None,
+    profile_path: Path | None = None,
 ) -> list[Check]:
     checks = [_check_python()]
     key_check, key = _check_key(root, environ)
@@ -127,9 +165,19 @@ def run_checks(
     sources_check, loaded = _check_sources(config_path)
     checks += [sources_check, _check_database(db_path)]
 
+    # Jev checks appear only when Jev is in use (a key or a profile exists), so other setups see nothing new.
+    try:
+        jev_found: tuple[str, str] | None = find_jev_api_key(root, environ)
+    except ConfigError:
+        jev_found = None
+    if jev_found or (profile_path is not None and Path(profile_path).is_file()):
+        checks += [_check_jev_key(jev_found), _check_profile(profile_path)]
+
     if online and client is not None:
         now = now or datetime.now(timezone.utc)
         checks.append(_check_groq(client, key))
+        if jev_found:
+            checks.append(_check_jev_online(client, jev_found[0]))
         for source in sources if sources is not None else (loaded or []):
             checks.append(_check_source_online(source, client, now))
     return checks

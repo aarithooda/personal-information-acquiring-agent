@@ -40,7 +40,11 @@ Put your key in a file named `.env` in the project folder:
 
 ```
 GROQ_API_KEY=your_key_here
+TYPESAFE_API_KEY=your_jev_key_here   # optional: enables Jev at Stage 1 (JEV_API_KEY also works)
 ```
+
+To use Jev you also need your interest profile: copy `config/interests.example.toml` to `config/interests.toml` and
+write your own. It is git-ignored because it describes you personally.
 
 `.env` (and `.env.txt`, in case Notepad added the extension) is git-ignored. PIA never prints the key.
 
@@ -69,7 +73,9 @@ few minutes because Groq's free tier rate-limits the initial batch of items; lat
 | `pia enrich` | Run the LLM triage on stored items and print what it decided | Stores triage |
 | `pia web` | Start the local web UI: New, Library, Favorites (see below) | Only your favorites (and upgrades an old schema) |
 
-Options go before the command: `pia --db other.db status`, `pia -v` (show warnings and retries).
+Options go before the command: `pia --db other.db status`, `pia -v` (show warnings and retries),
+`pia --profile other.toml`, and `pia --triage jev|llm|auto` (which Stage 1 to use; the default `auto` uses Jev when a
+key and a profile exist, otherwise the LLM, and prints which one it chose; `jev` fails loudly if either is missing).
 The four read-only commands open the database in SQLite's read-only mode, so they can never alter it, create it,
 or upgrade an old schema.
 
@@ -111,10 +117,15 @@ Code decides everything that must be exact; the LLM only supplies judgment.
 
 - **Deterministic code:** fetching and retrying, URL identity and dedup, timestamps, what counts as "new", how many
   items to show, ranking, layout, and the checkpoint.
-- **LLM stage 1 (`gpt-oss-20b`):** for each item, a category, an importance score and a one-line summary, returned as
-  schema-constrained JSON and validated again in code.
-- **LLM stage 2 (`gpt-oss-120b`):** the editor. It sees a shortlist side by side, picks the developments that truly
-  matter (at most the budget, fewer if little happened) and explains them using only the text provided.
+- **Stage 1, Jev (default when configured):** a decision model. For each item it answers nine small typed questions
+  (topic match, substance, low-value pattern, wildcard, ...) using *your interest profile*, and code combines the
+  answers into a relevance score. About 0.4 s per item, a fraction of a cent for a full run, one request per item run
+  four at a time. Jev cannot write text, so it produces no summaries.
+- **Stage 1, LLM (`--triage llm`, and the automatic fallback if Jev is down):** `gpt-oss-20b` gives each item a
+  category, an importance score and a one-line summary as schema-constrained JSON, validated again in code.
+- **Stage 2 (`gpt-oss-120b`):** the editor. It sees a shortlist side by side, picks the developments that truly matter
+  (at most the budget, fewer if little happened) and explains them using only the text provided. With Jev it also reads
+  your profile, so "why it matters" is tied to your interests.
 
 **"New" means new to you.** Items are chosen by state (not yet part of a briefing), never by comparing dates, so
 something published last week that PIA only discovered today still counts. The checkpoint is simply the last saved
@@ -143,10 +154,16 @@ categories, minimum Hacker News points, or minimum GitHub stars.
 | First-run lookback (3 days), maximum lookback (14 days), overlap | `src/pia/collect.py` |
 | Models, prompts, prompt version | `src/pia/llm/prompts.py` |
 | Triage batch size, attempts before giving up on an item | `src/pia/llm/enrich.py` |
+| Jev questions, the weights that combine the answers (version 0, unvalidated), concurrency | `src/pia/jev/triage.py` |
+| What Jev and the editor are told about you | `config/interests.toml` (compiled by `src/pia/profile.py`) |
 
 ## Privacy and safety
 
-- **Sent to Groq:** item titles, the first few hundred characters of each item's text, source names and popularity
+- **Sent to Jev (TypeSafe):** for every item, a *trimmed* copy of your profile (interest areas, signals and rules; not your
+  name, character descriptions, current projects or learning style), the item's title, source type and up to 500
+  characters of its text. TypeSafe states it does not train on customer data. Popularity numbers are not sent.
+- **Sent to Groq (editor, Jev mode):** the shortlisted items plus your profile as text (everything except your name).
+- **Sent to Groq (LLM triage mode):** item titles, the first few hundred characters of each item's text, source names and popularity
   numbers. Not your identity, not your reading history. The API key travels only in the `Authorization` header to
   `api.groq.com`.
 - **Stays local:** the database (`data/pia.db`) and every briefing. Both are git-ignored.
@@ -171,9 +188,10 @@ breaking sources and the LLM across many runs and checking database invariants a
 4. `http.py`: the single place that retries
 5. `llm/client.py`, `llm/prompts.py`, `llm/enrich.py`: structured output, untrusted input, batching, failure
 6. `briefing/rank.py`, `briefing/budget.py`, `llm/headlines.py`, `briefing/curate.py`: from scores to a briefing
-7. `history.py`, `doctor.py`, `cli.py`: read-only access and the command line
-8. `web/`: `favorites.py` and `queries.py` (data), `briefing_view.py` (parsing saved briefings), `app.py` (the API), `static/` (the page)
-9. `tests/`: `fakes.py` (a scriptable LLM), `test_pipeline.py` (your scenarios), `test_resilience.py` (fault injection)
+7. `profile.py`, `jev/client.py`, `jev/triage.py`: one profile compiled for several consumers, typed questions in and validated answers out, and combining answers in code
+8. `history.py`, `doctor.py`, `cli.py`: read-only access and the command line
+9. `web/`: `favorites.py` and `queries.py` (data), `briefing_view.py` (parsing saved briefings), `app.py` (the API), `static/` (the page)
+10. `tests/`: `fakes.py` (a scriptable LLM), `test_pipeline.py` (your scenarios), `test_resilience.py` (fault injection)
 
 | Concept | Where to see it |
 |---|---|
@@ -188,6 +206,11 @@ breaking sources and the LLM across many runs and checking database invariants a
 | Error taxonomy and batch bisection | `llm/client.py`, `llm/enrich.py` |
 | Read-only access | `history.py` |
 | Fault injection | `tests/test_resilience.py` |
+| A decision model versus a generalist LLM | `jev/client.py`, `jev/triage.py` |
+| Decompose a judgment into atomic questions, combine in code | `jev/triage.py` (`build_questions`, `derive`) |
+| Store raw model output so the formula can change without new calls | `jev/triage.py`, `enrichments.details` |
+| One source of truth, several renderings (profile to JSON and to text) | `profile.py` |
+| Backpressure for a bounded worker pool | `jev/triage.py` (`triage_pending`) |
 | API as a contract (typed responses) | `web/schemas.py`, `/docs` |
 | Idempotency in HTTP (`PUT`/`DELETE`, not a toggle) | `web/app.py`, `web/favorites.py` |
 | A read model, guarded by a contract test | `web/briefing_view.py`, `tests/test_briefing_view.py` |
@@ -217,6 +240,7 @@ is tested with Node when it is installed.
 | "Nothing was recorded" | Triage or every source failed, so the checkpoint was deliberately not moved. Run `pia` again |
 | `pia web` says it needs extra packages | `.venv\Scripts\python.exe -m pip install -e ".[web]"` |
 | Web page is empty | Run `run-pia.bat` first to create a briefing, then refresh |
+| `--triage jev` says the key or profile is missing | Add `TYPESAFE_API_KEY` to `.env` and create `config/interests.toml`; `pia doctor --online` checks both |
 | Emoji show as boxes | Use Windows Terminal; the old console font lacks them |
 
 ## Known limitations and what is next
@@ -224,6 +248,10 @@ is tested with Node when it is installed.
 - **Most items are judged on a title alone**, mainly Hacker News (measured: 58.6% of the first real briefing's 157
   items). Article-text extraction is a deliberate future consideration, **not implemented**; the analysis, options and
   constraints are in [docs/design.md](docs/design.md) under "Future consideration: article text".
+- **Jev's scoring is version 0 and unvalidated.** The weights in `jev/triage.py` are reasoned, not tuned. Measured on
+  the first real run: title-only items (Hacker News) score systematically low because there is little to judge,
+  and the shortlist is top-K by score, so a run can be all AI papers and no mathematics even though the profile asks
+  for discovery. See docs/design.md, "Jev at Stage 1", for the data and the options.
 - arXiv is fetched newest-first and capped, so it is a sample, not a complete feed.
 - The LLM editor tends to fill every headline slot; watch for padding.
 - The web UI cannot start a check itself (deliberately; see docs/design.md, D8) and reads old briefings by parsing their saved text.

@@ -7,6 +7,7 @@ which items are marked shown or skipped is deterministic code.
 
 import logging
 import sqlite3
+from collections.abc import Callable
 from datetime import datetime
 
 from pia.briefing.budget import also_budget, days_since, headline_budget, shortlist_size
@@ -18,6 +19,7 @@ from pia.llm.client import LLM, LLMError
 from pia.llm.enrich import enrich_pending
 from pia.llm.headlines import Headline, select_headlines
 from pia.llm.prompts import STAGE2_MODEL
+from pia.profile import Profile
 from pia.state import enriched_items, items_needing_enrichment
 
 log = logging.getLogger(__name__)
@@ -27,14 +29,25 @@ class EnrichmentFailed(Exception):
     """New items exist but none could be triaged. We commit nothing rather than brief on nothing."""
 
 
-def make_curator(llm: LLM, *, editor_model: str = STAGE2_MODEL) -> Prepare:
+def make_curator(
+    llm: LLM,
+    *,
+    editor_model: str = STAGE2_MODEL,
+    triage: Callable[[sqlite3.Connection, datetime], object] | None = None,
+    profile: Profile | None = None,
+) -> Prepare:
+    """`triage(conn, now)` is Stage 1. Default: the LLM triage (unchanged). Pass make_jev_triage(...) to use Jev.
+    `profile`, if given, is shown to the editor (Stage 2) so its choices and explanations follow the reader's own words."""
+    profile_text = profile.llm_text() if profile else None
+    run_triage = triage or (lambda conn, now: enrich_pending(conn, llm, now))
+
     def prepare(
         conn: sqlite3.Connection,
         checkpoint: datetime | None,
         now: datetime,
         results: list[SourceResult],
     ) -> BriefingContent:
-        enrich_pending(conn, llm, now)
+        run_triage(conn, now)
         triaged = enriched_items(conn)
         awaiting = len(items_needing_enrichment(conn))
         if not triaged and awaiting:
@@ -47,7 +60,9 @@ def make_curator(llm: LLM, *, editor_model: str = STAGE2_MODEL) -> Prepare:
         budget = headline_budget(days_since(checkpoint, now))
         editor_failed = False
         try:
-            headlines = select_headlines(llm, ranked[: shortlist_size(budget)], budget, model=editor_model)
+            headlines = select_headlines(
+                llm, ranked[: shortlist_size(budget)], budget, model=editor_model, profile_text=profile_text
+            )
         except LLMError as exc:
             log.warning("editor step failed, falling back to plain ranking: %s", exc)
             editor_failed = True

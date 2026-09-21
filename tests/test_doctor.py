@@ -175,3 +175,86 @@ def test_offline_mode_makes_no_network_calls(setup):
     client, seen = groq_client()
     check(setup, online=False, client=client, sources=[FakeSource("s")])
     assert seen == []
+
+
+# ---------- Jev and the interest profile (checks appear only when Jev is configured) ----------
+
+JEV_KEY = "jev_secret_key_abcdef123"
+PROFILE = """
+[core_interest_areas]
+[[core_interest_areas.area]]
+name = "AI agents"
+priority = "very_high"
+specific_subtopics = ["tool use"]
+"""
+
+
+def with_jev(setup, *, key=True, profile=True, profile_text=PROFILE):
+    root, config, db = setup
+    if key:
+        (root / ".env").write_text(f"GROQ_API_KEY={KEY}\nTYPESAFE_API_KEY={JEV_KEY}\n")
+    path = root / "interests.toml"
+    if profile:
+        path.write_text(profile_text, encoding="utf-8")
+    return path
+
+
+def test_nothing_about_jev_appears_for_a_setup_that_does_not_use_it(setup):
+    checks = check(setup)
+    assert not [name for name in checks if "Jev" in name or "profile" in name.lower()]
+
+
+def test_a_configured_jev_setup_reports_the_key_and_the_profile_without_leaking_the_key(setup):
+    profile_path = with_jev(setup)
+    checks = check(setup, profile_path=profile_path)
+    assert checks["Jev API key"].status == "ok" and ".env" in checks["Jev API key"].detail
+    profile_check = checks["Interest profile"]
+    assert profile_check.status == "ok" and "hash" in profile_check.detail and "tokens" in profile_check.detail
+    assert all(JEV_KEY not in c.name + c.detail for c in checks.values())
+
+
+def test_a_key_without_a_profile_warns_that_jev_triage_is_off(setup):
+    profile_path = with_jev(setup, profile=False)
+    checks = check(setup, profile_path=profile_path)
+    assert checks["Interest profile"].status == "warn" and "interests.example.toml" in checks["Interest profile"].detail
+
+
+def test_a_profile_without_a_key_warns_that_jev_triage_is_off(setup):
+    profile_path = with_jev(setup, key=False)
+    checks = check(setup, profile_path=profile_path)
+    assert checks["Jev API key"].status == "warn" and "TYPESAFE_API_KEY" in checks["Jev API key"].detail
+    assert checks["Interest profile"].status == "ok"
+
+
+def test_an_invalid_profile_is_a_failure(setup):
+    profile_path = with_jev(setup, profile_text="not = = toml")
+    assert check(setup, profile_path=profile_path)["Interest profile"].status == "fail"
+
+
+def test_a_very_large_profile_gets_an_advisory_warning(setup):
+    big = PROFILE + "\n[relevance_guidance]\nstrong_relevance_if = [" + ", ".join(f'"{"word " * 40}{i}"' for i in range(140)) + "]\n"
+    profile_path = with_jev(setup, profile_text=big)
+    result = check(setup, profile_path=profile_path)["Interest profile"]
+    assert result.status == "warn" and "large" in result.detail
+
+
+def jev_and_groq_client(jev_status=200):
+    def handler(request: httpx.Request) -> httpx.Response:
+        if "typesafe" in str(request.url):
+            body = {"models": [{"name": "jev-latest"}, {"name": "jev-preview"}]}
+            return httpx.Response(jev_status, json=body if jev_status == 200 else {})
+        return httpx.Response(200, json={"data": []})
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def test_online_checks_jev_by_listing_models_which_sends_no_item_data(setup):
+    profile_path = with_jev(setup)
+    checks = check(setup, profile_path=profile_path, online=True, client=jev_and_groq_client(), sources=[], now=T0)
+    assert checks["Jev API"].status == "ok" and "jev-latest" in checks["Jev API"].detail
+
+
+def test_online_reports_a_rejected_jev_key(setup):
+    profile_path = with_jev(setup)
+    result = check(setup, profile_path=profile_path, online=True, client=jev_and_groq_client(401), sources=[], now=T0)["Jev API"]
+    assert result.status == "fail" and "rejected" in result.detail and JEV_KEY not in result.detail
