@@ -1,5 +1,10 @@
 # PIA V1 Design
 
+> **About this document.** This is the project's chronological decision log. Sections were written at the time and keep their
+> original tense and status: "not yet measured" or "no result is claimed" describes the moment of writing. For the current
+> state see the [README](../README.md), [jev.md](jev.md) and [evaluation.md](evaluation.md), which supersede any older
+> statement here about how Jev performs.
+
 Question V1 answers: **"What important things have happened since I last checked?"**
 
 ## Pipeline

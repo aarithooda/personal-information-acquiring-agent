@@ -3,6 +3,16 @@
 Benchmark version: **v2**. The contract is [METHODOLOGY.md](METHODOLOGY.md); it was fixed before you see any item and must not change
 afterwards. This file is the practical guide.
 
+> **Status (release): evaluated, and the corpus is spent.** Labelling, the label freeze, the one run per system and the analysis
+> are complete. The results are in [../docs/evaluation.md](../docs/evaluation.md) and the aggregate report is in
+> [results/benchmark_v2_report.md](results/benchmark_v2_report.md). The corpus, labels, arm outputs and item pool
+> (`benchmark_v2/data/`) describe one person's reading and opinions and are **not published**, so the numbers cannot be
+> regenerated from this repository. The corpus builder is tied to the original study (a fixed historical window, and it needs
+> the private Benchmark V1 snapshot). What follows is the original labeller's guide, kept because it is part of the protocol.
+> Do not reuse this corpus or these labels to tune the system: a changed system needs a new benchmark version.
+
+*Historical text, as it stood when labelling began (no longer current; see the status note above):*
+
 **Where things stand when you start labelling:** the corpus (200 items) is built and frozen, the methodology is frozen, and **no model has
 seen this corpus**. No Jev output, LLM output, score or rank exists for it. Your labels are what everything is later measured against.
 

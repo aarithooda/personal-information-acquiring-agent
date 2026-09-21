@@ -3,6 +3,12 @@
 A small, honest experiment: **how well does PIA's Stage 1 (Jev, or the older LLM triage) find the items its reader
 actually wants?** The reader labels 186 real items blind; the tooling scores each Stage 1 against those labels.
 
+> **Status (release): Benchmark V1 was run and is frozen.** It could not distinguish the Jev design of the time from the LLM Stage 1 (see
+> [../docs/evaluation.md](../docs/evaluation.md)). Its data (`benchmarks/data/`: items, labels, arm outputs, reports) describes one
+> person's reading and is not published. The tooling remains usable on your own data (see the commands below), and the fresh-corpus
+> follow-up is [../benchmark_v2/README.md](../benchmark_v2/README.md). Some text below was written before the labels existed and
+> says so.
+
 Benchmark version: **v1**. Every report prints it. See rule 7 under *Decision rules* for what a new version means.
 
 Nothing under `src/pia` is changed by this folder. It reads production code, never modifies it, and never touches

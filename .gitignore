@@ -9,13 +9,22 @@ __pycache__/
 !.env.example
 *.key
 
-# Local state: the database and generated briefings are personal data
-data/*.db
-data/*.db-*
+# Local state: the database and generated briefings are personal data (this includes demo and scratch databases)
+data/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
 briefings/
 
-# Local tool configuration
+# Local tool and editor configuration
 .claude/
+.vscode/
+.idea/
+
+# Build output
+build/
+dist/
 
 # Personal interest profile (describes the user). config/interests.example.toml is the committed template.
 config/interests.toml
