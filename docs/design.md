@@ -123,7 +123,7 @@ Measured on 158 real items (2026-09-20):
 
 Observed live (2026-09-20, same 158 items): headlines 1 / 4 / 15 for 1 / 3 / 10 days. Limits found:
 - Explanations are only as good as the source text. Papers have abstracts; HN links have only a title, so
-  they are hard to summarize. Fetching article text is a V4 (deep dive) job.
+  they are hard to summarize. See "Future consideration: article text" below.
 - In all three runs the editor filled every slot. The "choose fewer" path is covered by unit tests but
   not yet observed with the real model; watch for padding and tune the editor prompt if it persists.
 
@@ -153,6 +153,99 @@ Observed live (2026-09-20, same 158 items): headlines 1 / 4 / 15 for 1 / 3 / 10 
 Considered and not done: proactive rate-limit pacing from `x-ratelimit-*` headers (reactive retry
 worked; revisit if daily runs feel slow).
 
-Finding: **80% of items are title-only** (mostly Hacker News, which gives a title and a link). Triage and
-the editor therefore judge most items on the title alone. Fetching and extracting linked article text is
-the highest-value quality improvement available.
+Finding: **80% of items are title-only** (mostly Hacker News). Triage and the editor judge most items on
+the title alone. Analysis and options: see "Future consideration: article text" below. Not implemented.
+
+## Future consideration: article text (V1.5 / V4). NOT IMPLEMENTED
+
+**Status:** documented only, by decision of the project owner (2026-09-21). V1 does not fetch arbitrary
+web pages. This section records the finding, the options and the constraints, so the decision can be
+made later with the reasoning intact.
+
+### The finding
+
+On 2026-09-20, 40 real items were triaged with `stage1-v2`: **32 (80%) had no text at all**, 8 had some.
+
+| Has text | Source of that text |
+|---|---|
+| arXiv, HF Daily Papers | the paper abstract |
+| GitHub | repo description + topics |
+| Quanta, DeepMind, OpenAI (RSS) | the feed summary |
+| **Title only** | Hacker News (Algolia returns title + URL; `story_text` exists only for Ask/Show posts), RSS feeds without summaries (e.g. HF blog) |
+
+Hacker News is also the largest source by volume, so the majority of items are judged on a headline.
+
+Consequences observed or implied:
+1. Triage and the editor rest on weak evidence for most items. Both prompts already forbid guessing.
+2. Since M6, title-only items get no summary at all, so they appear as bare links in the extras.
+3. **Evidence-availability bias:** papers ship with abstracts and HN stories do not, so the briefing leans
+   toward papers. That reflects what data we hold, not what matters to the reader.
+4. Editor explanations for HN-origin developments are necessarily thin.
+
+This is a single-day, n=40 sample. Re-measure before acting. The share of title-only items among triaged
+items over the last week is one query:
+
+```sql
+SELECT ROUND(100.0 * SUM(TRIM(COALESCE(i.content_raw, '')) = '') / COUNT(*), 1) AS pct_title_only,
+       COUNT(*) AS triaged
+FROM items i JOIN enrichments e ON e.item_id = i.id;
+```
+
+### Options
+
+| | Approach | Gain | Cost / risk |
+|---|---|---|---|
+| A | Use text HN already provides (Ask/Show `story_text`) | Small | Almost none; no new fetching |
+| B | Fetch only page metadata (`og:description`, `<meta name=description>`) | Medium | Still fetches arbitrary URLs |
+| C | Full main-content extraction (readability-style) | Highest | Highest: security, legal, tokens |
+| D | Do B/C **lazily, for the editor shortlist only** (about 2N+2 items, not all ~150) | High | Bounds cost, load and exposure |
+| E | V4 deep dive: extraction becomes a tool an agent chooses to call | Highest | Needs the tool-safety design below |
+
+Likely path when the time comes: **A immediately if trivial; D as V1.5** behind a fetch-policy layer;
+**E (V4)** reuses that same layer as an agent tool instead of building a second fetcher.
+
+### Constraints any implementation must respect
+
+- **Placement:** after ranking, before the editor. The long tail stays title-triaged; the shortlist gets
+  real text. Decide then whether stage 1 gets a second pass or the editor alone benefits.
+- **Raw vs derived data (D4 again):** never overwrite `items.content_raw`. Store fetched text in its own
+  table (e.g. `item_texts`: item_id, final_url, fetched_at, http_status, content_type, text,
+  extractor_version, error), so it is cacheable, re-runnable and records failures. Schema migration v3.
+- **Provenance in prompts:** the editor should know which text came from the source and which was fetched.
+- **Graceful degradation:** a fetch failure leaves the item title-only. It must never block a briefing or
+  touch the checkpoint. Negative-cache failures so a dead URL is not retried every run. Extend the
+  fault-injection suite: fetch chaos must not change any invariant that holds today.
+- **Bounded work:** per-request timeout, response size cap, per-run time budget, per-domain rate limit,
+  limited concurrency, `text/html` (and plain text) only.
+- **Security (the main reason this is deferred):**
+  - URLs come from untrusted feeds, so this is a **server-side request forgery (SSRF)** surface. Allow only
+    http/https; refuse loopback, private, link-local and cloud-metadata addresses; re-validate after every
+    redirect (and cap redirects); send no cookies or credentials.
+  - Fetched pages are a much larger **prompt-injection** surface than titles. The current defence (delimit
+    as data, forbid obeying it, schema-constrained output, no tools) is adequate while the LLM cannot act.
+    In V4, once an agent has tools, this needs tool allow-lists and no secrets in the model's context.
+  - Parsing untrusted HTML is itself an attack surface: pin and review the extractor dependency
+    (candidates to evaluate: `trafilatura`, `readability-lxml`).
+- **Legal and etiquette:** respect robots.txt and paywalls, use a distinct User-Agent, keep extracted text
+  as a local cache for personal use with limited retention, never redistribute it.
+- **Token budget:** stage-2 input grows with real text, and Groq's free tier is already token-rate-limited
+  (see M4). Truncate deliberately and keep the shortlist small.
+- **Testing:** recorded HTML fixtures, `httpx.MockTransport`, and dedicated SSRF cases (decimal/octal IPs,
+  redirects to 127.0.0.1, IPv6 forms, DNS names that resolve to private addresses).
+
+### How to decide
+
+1. Re-measure the title-only share over at least a week of real data.
+2. Read a few real briefings: are the HN-origin headlines and extras noticeably thinner than paper items?
+3. Cheap experiment before building anything: hand-check ~20 HN stories and compare the editor's picks from
+   titles alone against picks with the article text pasted in. If the picks barely change, defer further.
+4. Only then choose A, D or E.
+
+### Concepts to take from this
+
+- **Evidence-availability bias:** a model (or ranker) favours whatever has the most evidence, which is not
+  the same as what matters. Watch for it whenever input quality varies by source.
+- **Trust boundaries:** every URL fetched from the open web crosses one. SSRF and prompt injection are the
+  two classic failures.
+- **Raw vs derived data**, and **graceful degradation**: both are already V1 rules; this feature must obey them.
+
