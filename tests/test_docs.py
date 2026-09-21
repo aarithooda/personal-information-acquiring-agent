@@ -47,3 +47,21 @@ def test_the_readme_documents_the_jev_setup_and_privacy_of_the_profile():
     text = readme_text()
     for needed in ("TYPESAFE_API_KEY", "config/interests.toml", "--triage", "interests.example.toml", "Sent to Jev"):
         assert needed in text, needed
+
+
+def test_the_project_is_named_consistently():
+    """The public name is "Personal Information Acquiring Agent" (short form PIA); `pia` stays the technical identifier.
+
+    Only public documentation and packaging metadata are checked. Nothing under src/ is: the evaluated source tree is frozen
+    (benchmark_v2/FREEZE.json), so user-facing strings inside it are deliberately left as they were when it was evaluated."""
+    import tomllib
+
+    name = "Personal Information Acquiring Agent"
+    assert readme_text().splitlines()[0].startswith(f"# {name}")
+    assert tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["description"].startswith(name)
+    stale = [
+        str(path.relative_to(ROOT))
+        for path in [README, ROOT / "pyproject.toml", *(ROOT / "docs").glob("*.md")]
+        if "Personal Intelligence Agent" in path.read_text(encoding="utf-8")
+    ]
+    assert not stale, f"the old project name is still used in: {stale}"

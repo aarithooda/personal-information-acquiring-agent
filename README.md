@@ -1,10 +1,11 @@
-# PIA: Personal Intelligence Agent
+# Personal Information Acquiring Agent (PIA)
 
-A local tool that answers one question, **"What important things have happened since I last checked?"**, by triaging new
+**PIA** (the short form used below, and the name of the `pia` command and Python package) is a local tool that answers one question, **"What important things have happened since I last checked?"**, by triaging new
 papers, posts and repositories against your own interest profile and writing you a short briefing.
+It acquires information from a few public sources, remembers what you have seen, and hands you only what is new to you.
 
 > **Status: a personal, single-reader project, published to be read and learned from.** It works and is well tested
-> (741 tests), but it is built around one person's workflow, developed on Windows, and not a product for arbitrary users.
+> (742 tests), but it is built around one person's workflow, developed on Windows, and not a product for arbitrary users.
 > See [Limitations](#limitations).
 
 ## The problem
@@ -270,7 +271,7 @@ pip install -e ".[dev]"
 pytest
 ```
 
-Expected result on the reference machine (Windows 11, Python 3.11): **741 passed, 1 skipped** in about 100 seconds; the skip
+Expected result on the reference machine (Windows 11, Python 3.11): **742 passed, 1 skipped** in about 100 seconds; the skip
 is a test that needs a personal profile file. The suite is deterministic and offline by construction: a fixture makes any
 non-loopback connection fail the test, HTTP is replaced by a fake transport, the LLM by a scriptable fake, and time by an
 injected clock. No test uses your API keys, your database or your profile. The front-end logic is tested with Node when it is
