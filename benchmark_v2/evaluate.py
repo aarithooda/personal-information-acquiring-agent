@@ -11,6 +11,7 @@ the conservative convention; the bootstrap resamples item indices with random.Ra
 within-source percentile over the ranking pool.
 """
 
+import functools
 import hashlib
 import json
 import random
@@ -488,6 +489,7 @@ app = typer.Typer(add_completion=False, help="Benchmark v2 evaluation: run the a
 
 
 def _friendly(fn):
+    @functools.wraps(fn)  # keeps the real signature, so Typer sees the documented arguments
     def run(*a, **k):
         try:
             return fn(*a, **k)
@@ -495,7 +497,6 @@ def _friendly(fn):
             typer.secho(str(exc), fg=typer.colors.RED)
             raise typer.Exit(1)
 
-    run.__name__, run.__doc__ = fn.__name__, fn.__doc__
     return run
 
 

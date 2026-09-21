@@ -344,3 +344,19 @@ def test_the_evaluation_module_never_reads_v1_labels_while_building_or_running_a
 def test_an_undefined_metric_yields_no_skill_claim_instead_of_an_error():
     v = ev.verdicts(perm={"P2": {"p": None}, "P3": {"p": 0.01}}, comparisons={"X": {"P2": {"ci": (None, None), "mean": None}, "P1": {"ci": (None, None), "mean": None}}}, kappa=0.6, n_positive=30)
     assert v["D1"] == "Ranking skill not demonstrated" and v["D2"]["X"] == "cannot tell"
+
+
+# ---------- the command line ----------
+
+
+def test_the_command_line_exposes_the_documented_arguments_and_refuses_before_the_labels_are_frozen(tmp_path):
+    from typer.testing import CliRunner
+
+    runner = CliRunner()
+    help_text = runner.invoke(ev.app, ["arm", "--help"]).output
+    assert "which" in help_text and "--data-dir" in help_text  # the wrapper must not hide the real signature
+    bad = runner.invoke(ev.app, ["arm", "bogus", "--data-dir", str(tmp_path)])
+    assert bad.exit_code != 0 and "must be one of" in bad.output
+    early = runner.invoke(ev.app, ["arm", "jev-v2", "--data-dir", str(tmp_path)])
+    assert early.exit_code == 1 and "labels are not frozen" in early.output and "Traceback" not in early.output
+    assert runner.invoke(ev.app, ["analyze", "--data-dir", str(tmp_path)]).exit_code == 1
