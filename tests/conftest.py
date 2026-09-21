@@ -1,20 +1,50 @@
 """Test-wide guarantees.
 
-The README says no test touches the network. That is enforced here, not promised: any attempt
-to open a real socket or resolve a hostname during a test fails immediately with a clear message.
-HTTP is replaced by httpx.MockTransport, the LLM by fakes, and time by an injected clock.
+No test may reach beyond this machine. That is enforced here, not promised: an attempt to connect to,
+or resolve, anything that is not loopback fails immediately with a clear message. (Loopback stays open
+because asyncio, and so FastAPI's TestClient, opens an in-process socket pair on Windows.)
+HTTP to the outside world is replaced by httpx.MockTransport, the LLM by fakes, and time by an injected clock.
 """
 
+import ipaddress
 import socket
 
 import pytest
 
 
-@pytest.fixture(autouse=True)
-def no_real_network(monkeypatch):
-    def blocked(*args, **kwargs):
-        raise RuntimeError("a test tried to use the real network; use httpx.MockTransport or a fake")
+def _is_loopback(host) -> bool:
+    if isinstance(host, bytes):
+        host = host.decode()
+    if host in ("localhost", "", None):
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
 
-    monkeypatch.setattr(socket.socket, "connect", blocked)
-    monkeypatch.setattr(socket.socket, "connect_ex", blocked)
-    monkeypatch.setattr(socket, "getaddrinfo", blocked)
+
+@pytest.fixture(autouse=True)
+def nothing_leaves_this_machine(monkeypatch):
+    real_connect, real_connect_ex, real_getaddrinfo = socket.socket.connect, socket.socket.connect_ex, socket.getaddrinfo
+
+    def refuse(target):
+        raise RuntimeError(f"a test tried to reach {target!r}; use httpx.MockTransport or a fake")
+
+    def guarded_connect(self, address):
+        if self.family in (socket.AF_INET, socket.AF_INET6) and not _is_loopback(address[0]):
+            refuse(address)
+        return real_connect(self, address)
+
+    def guarded_connect_ex(self, address):
+        if self.family in (socket.AF_INET, socket.AF_INET6) and not _is_loopback(address[0]):
+            refuse(address)
+        return real_connect_ex(self, address)
+
+    def guarded_getaddrinfo(host, *args, **kwargs):
+        if not _is_loopback(host):
+            refuse(host)
+        return real_getaddrinfo(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket.socket, "connect", guarded_connect)
+    monkeypatch.setattr(socket.socket, "connect_ex", guarded_connect_ex)
+    monkeypatch.setattr(socket, "getaddrinfo", guarded_getaddrinfo)

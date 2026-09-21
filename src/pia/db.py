@@ -73,6 +73,14 @@ MIGRATIONS = [
     """
     ALTER TABLE items ADD COLUMN triage_attempts INTEGER NOT NULL DEFAULT 0;
     """,
+    # v3: items the user marked as favorite (web UI). item_id as PRIMARY KEY makes "mark" idempotent:
+    # marking twice is the same as marking once. Deleting an item removes its favorite row.
+    """
+    CREATE TABLE favorites (
+        item_id    INTEGER PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL
+    );
+    """,
 ]
 
 
