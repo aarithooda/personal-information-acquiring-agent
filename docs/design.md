@@ -255,3 +255,29 @@ Likely path when the time comes: **A immediately if trivial; D as V1.5** behind 
   two classic failures.
 - **Raw vs derived data**, and **graceful degradation**: both are already V1 rules; this feature must obey them.
 
+
+## Polish (M7): inspection, diagnostics, packaging
+
+- **Read-only is a separate connection type, not a convention.** `history.connect_readonly` opens SQLite
+  with `mode=ro` and `PRAGMA query_only`, refuses to create a missing file, and never migrates. `status`,
+  `history`, `show` and `doctor` use it. Tests prove the database file is byte-for-byte unchanged, and
+  writing through it raises. This also fixed a real defect: the old `status` used `connect()`, which
+  silently upgraded an old-schema database on disk.
+- **`pia show` defaults to the latest briefing that had content.** Every check is recorded, including
+  "nothing new" ones, so the newest row is often empty (this confused the first real run).
+- **`pia doctor` never prints the key** (found / where / length / shape only), makes no writes, and treats
+  the network as opt-in (`--online`): it tries each source over the last day, storing nothing, and asks
+  Groq for its model list (no data sent). Exit code 1 only for failures, not warnings. A schema older than
+  the code is a warning ("will upgrade"), a newer one is a failure.
+- **`run-pia.bat`:** double-clicking `pia.exe` closes the window on exit, so the launcher pauses only when
+  given no arguments (scriptable otherwise) and passes through pia's exit code. CRLF is pinned in
+  `.gitattributes`. The no-argument path is not executed by tests because it runs the real pipeline.
+- **Docs are tested:** every CLI command must appear in the README, and the README's "add a source" TOML
+  example must load. A `tests/conftest.py` fixture makes any real socket or DNS use in a test fail, which
+  turns "no test touches the network" from a promise into a guarantee.
+
+Verified on the real database: history/status/show/doctor left `data/pia.db` byte-identical, and so did
+a full test run. WAL mode keeps a `-shm` read-index file next to the database; it is a cache, not data.
+
+Status: **V1 complete** (M1-M7). Deliberately deferred: article-text extraction (see above), a scheduler,
+interest learning (V2).
