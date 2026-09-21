@@ -153,7 +153,7 @@ Observed live (2026-09-20, same 158 items): headlines 1 / 4 / 15 for 1 / 3 / 10 
 Considered and not done: proactive rate-limit pacing from `x-ratelimit-*` headers (reactive retry
 worked; revisit if daily runs feel slow).
 
-Finding: **80% of items are title-only** (mostly Hacker News). Triage and the editor judge most items on
+Finding: **most items are title-only** (58.6% of the first real briefing's 157 items; 80% of the newest 40), mostly Hacker News. Triage and the editor judge most items on
 the title alone. Analysis and options: see "Future consideration: article text" below. Not implemented.
 
 ## Future consideration: article text (V1.5 / V4). NOT IMPLEMENTED
@@ -164,7 +164,13 @@ made later with the reasoning intact.
 
 ### The finding
 
-On 2026-09-20, 40 real items were triaged with `stage1-v2`: **32 (80%) had no text at all**, 8 had some.
+Two measurements, both real data:
+
+- 2026-09-20, the **newest 40** items triaged with `stage1-v2`: 32 (**80%**) had no text. Newest-first
+  over-samples Hacker News, so this is an upper bound.
+- 2026-09-21, **all 157** items in the first real briefing (query below): **58.6%** title-only.
+
+Either way, a clear majority of items are judged on a headline.
 
 | Has text | Source of that text |
 |---|---|
@@ -173,7 +179,7 @@ On 2026-09-20, 40 real items were triaged with `stage1-v2`: **32 (80%) had no te
 | Quanta, DeepMind, OpenAI (RSS) | the feed summary |
 | **Title only** | Hacker News (Algolia returns title + URL; `story_text` exists only for Ask/Show posts), RSS feeds without summaries (e.g. HF blog) |
 
-Hacker News is also the largest source by volume, so the majority of items are judged on a headline.
+Hacker News is also the largest source by volume, which is why title-only items dominate.
 
 Consequences observed or implied:
 1. Triage and the editor rest on weak evidence for most items. Both prompts already forbid guessing.
@@ -182,8 +188,8 @@ Consequences observed or implied:
    toward papers. That reflects what data we hold, not what matters to the reader.
 4. Editor explanations for HN-origin developments are necessarily thin.
 
-This is a single-day, n=40 sample. Re-measure before acting. The share of title-only items among triaged
-items over the last week is one query:
+Both samples are a single day. Re-measure over a week of real data before acting. The share of title-only
+items among triaged items is one query (verified against the real database):
 
 ```sql
 SELECT ROUND(100.0 * SUM(TRIM(COALESCE(i.content_raw, '')) = '') / COUNT(*), 1) AS pct_title_only,
