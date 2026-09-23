@@ -22,6 +22,9 @@ briefings/
 .vscode/
 .idea/
 
+# Windows shortcuts to the launchers: personal (embed a local path) and not part of the project
+*.lnk
+
 # Build output
 build/
 dist/

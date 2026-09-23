@@ -24,6 +24,24 @@ def test_output_survives_a_legacy_windows_encoding(monkeypatch):
     assert "Māori".encode("utf-8") in raw.getvalue()
 
 
+def test_the_default_command_prints_a_startup_banner_naming_sources_and_the_checkpoint(tmp_path, monkeypatch):
+    """This banner exists so `pia` (fetch + triage + brief) can never be mistaken for `pia web` (read-only)."""
+    import pia.cli
+    from fakes import SmartLLM
+
+    db = tmp_path / "pia.db"
+    source = FakeSource("my_source", [make_item("my_source", n, None) for n in range(3)])  # undated: no wall-clock window to miss
+    monkeypatch.setattr(pia.cli, "load_sources", lambda path: [source])
+    monkeypatch.setattr(pia.cli, "make_llm", lambda client: SmartLLM())
+
+    result = runner.invoke(app, ["--db", str(db)])
+    assert result.exit_code == 0
+    assert "Personal Information Acquiring Agent" in result.output
+    assert "full pipeline" in result.output
+    assert "Sources: my_source" in result.output
+    assert "Last checkpoint: none (first run)" in result.output
+
+
 def test_enrich_without_an_api_key_explains_what_to_do(tmp_path, monkeypatch):
     import pia.cli
 
@@ -61,6 +79,7 @@ def test_default_command_prints_a_briefing_and_records_the_checkpoint(tmp_path, 
     source = FakeSource("a", [make_item("a", n, T0) for n in range(3)])
     monkeypatch.setattr(pia.cli, "load_sources", lambda path: [source])
     monkeypatch.setattr(pia.cli, "make_llm", lambda client: SmartLLM())
+    monkeypatch.setattr(pia.cli, "_now", lambda: T0)  # deterministic: T0 must fall inside the fetch window regardless of the real date
 
     result = runner.invoke(app, ["--db", str(db)])
     assert result.exit_code == 0
@@ -90,6 +109,7 @@ def test_default_command_reports_total_triage_failure_and_records_nothing(tmp_pa
 
     monkeypatch.setattr(pia.cli, "load_sources", lambda path: [FakeSource("a", [make_item("a", 1, T0)])])
     monkeypatch.setattr(pia.cli, "make_llm", lambda client: SmartLLM(triage_error=LLMError("down")))
+    monkeypatch.setattr(pia.cli, "_now", lambda: T0)  # deterministic: T0 must fall inside the fetch window regardless of the real date
     db = tmp_path / "pia.db"
     result = runner.invoke(app, ["--db", str(db)])
     assert result.exit_code == 1 and "nothing was recorded" in result.output.lower()
@@ -128,6 +148,36 @@ def test_status_reports_checkpoint_pending_items_and_source_health(tmp_path):
     assert "Not yet briefed: 0" in result.output
     assert "good" in result.output and "ok" in result.output
     assert "bad" in result.output and "service down" in result.output
+
+
+def test_status_shows_when_a_currently_failing_source_last_succeeded(tmp_path):
+    from datetime import timedelta
+
+    from pia.collect import collect
+
+    db = tmp_path / "pia.db"
+    conn = connect(db)
+    flaky = FakeSource("flaky", [make_item("flaky", 1, T0)])
+    collect(conn, None, [flaky], T0)  # succeeds once...
+    flaky.error = SourceError("rate limited")
+    collect(conn, None, [flaky], T0 + timedelta(days=1))  # ...then starts failing
+    conn.close()
+
+    result = runner.invoke(app, ["--db", str(db), "status"])
+    assert "FAILED: rate limited" in result.output
+    assert "last succeeded 2026-09-20" in result.output
+
+
+def test_status_says_never_succeeded_for_a_source_that_has_always_failed(tmp_path):
+    db = tmp_path / "pia.db"
+    conn = connect(db)
+    bad = FakeSource("bad", error=SourceError("dns failure"))
+    good = FakeSource("good", [make_item("good", 1, T0)])
+    run_briefing(conn, None, [good, bad], now=T0)
+    conn.close()
+
+    result = runner.invoke(app, ["--db", str(db), "status"])
+    assert "never succeeded" in result.output
 
 
 # ---------- read-only inspection commands: history / show / status ----------
@@ -352,6 +402,7 @@ def _jev_setup(tmp_path, monkeypatch, *, key=True, profile=True, jev=None):
     monkeypatch.setattr(pia.cli, "make_jev", make_jev)
     monkeypatch.setattr(pia.cli, "make_llm", lambda client: llm)
     monkeypatch.setattr(pia.cli, "load_sources", lambda path: [source])
+    monkeypatch.setattr(pia.cli, "_now", lambda: T0)  # deterministic: T0 must fall inside the fetch window regardless of the real date
     return profile_path, fake, llm
 
 

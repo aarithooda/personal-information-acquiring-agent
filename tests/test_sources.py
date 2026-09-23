@@ -219,3 +219,34 @@ def test_rss_fetch_returns_only_items_inside_the_window():
 def test_rss_fetch_raises_source_error_on_garbage():
     with pytest.raises(SourceError):
         RssSource(name="x", url="https://x.test/feed").fetch(client_returning("<html>oops</html> nope"), *WIDE)
+
+
+def test_a_feed_with_zero_entries_is_valid_and_returns_no_items():
+    assert parse_rss('<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>', source="x") == []
+
+
+# ---------- google_ai (config/sources.toml; uses the generic RSS adapter, no dedicated code) ----------
+
+
+def test_parse_google_ai_extracts_fields_and_strips_html_from_the_summary():
+    items = parse_rss(fixture("google_ai.xml"), source="google_ai")
+    assert len(items) == 3
+    first = items[0]
+    assert first.source == "google_ai"
+    assert first.url == "https://blog.google/innovation-and-ai/technology/ai/gemini-3-8-rollout/"
+    assert first.title == "Gemini 3.8 is rolling out across Search, Workspace and the Gemini app"
+    assert first.published_at == utc(2026, 9, 22, 16, 0, 0)
+    assert "<" not in first.content
+    assert "Gemini 3.8 brings faster responses" in first.content
+
+
+def test_parse_google_ai_allows_an_entry_with_no_description():
+    items = parse_rss(fixture("google_ai.xml"), source="google_ai")
+    assert items[2].title == "How the Gemini API is helping developers ship faster"
+    assert items[2].content is None
+
+
+def test_google_ai_fetch_returns_only_items_inside_the_window():
+    source = RssSource(name="google_ai", url="https://blog.google/innovation-and-ai/technology/ai/rss/")
+    items = source.fetch(client_returning(fixture("google_ai.xml")), utc(2026, 9, 20), utc(2026, 9, 23))
+    assert [i.url for i in items] == ["https://blog.google/innovation-and-ai/technology/ai/gemini-3-8-rollout/"]

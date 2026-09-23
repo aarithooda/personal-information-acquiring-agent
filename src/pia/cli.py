@@ -29,7 +29,7 @@ from pia.llm.enrich import enrich_pending
 from pia.pipeline import AllSourcesFailed, run_briefing
 from pia.profile import Profile, ProfileError, load_profile
 from pia.sources.registry import load_sources
-from pia.state import enriched_items, get_checkpoint, last_fetch_runs, pending_items
+from pia.state import enriched_items, get_checkpoint, get_cursor, last_fetch_runs, pending_items
 
 app = typer.Typer(add_completion=False, help="Personal Intelligence Agent: what happened since I last checked?")
 
@@ -77,11 +77,27 @@ def main(
         _briefing(ctx.obj)
 
 
+def _now() -> datetime:
+    """The wall clock, as its own function so tests can pin it (see `pia.pipeline.run_briefing`, which
+    already takes `now` as a parameter for the same reason: nothing here should depend on real time)."""
+    return datetime.now(timezone.utc)
+
+
 def _briefing(settings: Settings) -> None:
+    """The full pipeline: fetch every source, triage, rank, write and commit a briefing.
+
+    This is the ONLY command that talks to Jev/Groq or changes the checkpoint. `pia web` (a different
+    command, and a different .bat file) only reads what is already here; it fetches nothing. The banner
+    below exists so the two are never confused for one another at a glance."""
     console = Console()
     conn = connect(settings.db)
     sources = load_sources(settings.config)
-    now = datetime.now(timezone.utc)
+    checkpoint = get_checkpoint(conn)
+    console.print("[bold]PIA - Personal Information Acquiring Agent[/bold]  (full pipeline: fetch, triage, rank, brief)")
+    console.print(f"Database: {settings.db}")
+    console.print(f"Last checkpoint: {checkpoint:%Y-%m-%d %H:%M UTC}" if checkpoint else "Last checkpoint: none (first run)")
+    console.print(f"Sources: {', '.join(s.name for s in sources)}")
+    now = _now()
     with _http_client() as client:
         try:
             llm = make_llm(client)
@@ -195,7 +211,12 @@ def status(ctx: typer.Context) -> None:
     typer.echo(f"Could not be processed (given up on): {failed}")
     typer.echo("Sources:")
     for run in last_fetch_runs(conn):
-        detail = f"ok, {run['item_count']} items" if run["status"] == "ok" else f"FAILED: {run['error']}"
+        if run["status"] == "ok":
+            detail = f"ok, {run['item_count']} items"
+        else:
+            last_ok = get_cursor(conn, run["source"])
+            since = f"; last succeeded {last_ok:%Y-%m-%d %H:%M UTC}" if last_ok else "; never succeeded"
+            detail = f"FAILED: {run['error']}{since}"
         typer.echo(f"  {run['source']:<10} {run['started_at'][:16]}  {detail}")
 
 

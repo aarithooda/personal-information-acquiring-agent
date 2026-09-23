@@ -124,9 +124,16 @@ labour, not a claim that Jev is more accurate than a larger model**: the evaluat
 | Hugging Face Daily Papers | community-curated ML papers | `min_upvotes` |
 | Hacker News | stories via the Algolia API | `min_points` |
 | GitHub | repositories *created* in the window that match a query | `query`, `min_stars` |
-| RSS / Atom | any feed you add; Quanta, DeepMind, OpenAI and the Hugging Face blog are preconfigured | none |
+| RSS / Atom | any feed you add; Quanta, DeepMind, Google AI, OpenAI and the Hugging Face blog are preconfigured | none |
 
 PIA calls only these APIs and feeds. It does not fetch arbitrary web pages (see [Limitations](#limitations)).
+
+**Frontier AI labs:** DeepMind and Google's own AI blog give explicit Google/Gemini coverage; OpenAI and
+Hugging Face have official feeds too. Anthropic, Groq and Z.ai/GLM do **not** currently have a source of
+their own, because none publishes an official RSS/Atom feed or another clean structured mechanism (checked
+2026-09-23) — building one would mean scraping rendered HTML, which this project avoids. They are reachable
+only indirectly, via Hacker News or GitHub, if a story gets enough attention. The full evaluation, including
+providers considered and rejected, is in [docs/sources.md](docs/sources.md).
 
 ## Quickstart
 
@@ -377,6 +384,13 @@ run-pia.bat, run-pia-web.bat   Windows launchers
 
 New to the code? [docs/reading-the-code.md](docs/reading-the-code.md) suggests an order and maps concepts to files.
 
+**The two launchers do different things — do not confuse them.** `run-pia.bat` is the **full pipeline**: it
+fetches every source, runs Jev/Groq, ranks, and writes a briefing (the only one that changes anything).
+`run-pia-web.bat` is a **read-only viewer** of what `run-pia.bat` already found; it fetches nothing and never
+calls Jev or Groq. Both now print a banner saying which one you launched, and `run-pia.bat` prints its
+checkpoint and source list before it does anything, specifically so a briefing that looks unexpectedly old or
+empty is never mistaken for "the pipeline ran and found nothing."
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -386,6 +400,8 @@ New to the code? [docs/reading-the-code.md](docs/reading-the-code.md) suggests a
 | Window closes immediately (Windows) | Use `run-pia.bat`, or run `pia` from a terminal |
 | First run is slow | Groq's free tier rate-limits; PIA waits and retries automatically |
 | "Nothing was recorded" | Triage or every source failed, so the checkpoint deliberately did not move. Run `pia` again |
+| A source keeps failing | `pia status` now shows when it last *succeeded*, not just its last attempt, so a source that has been down for days is obvious rather than looking like a one-off |
+| A briefing looks unexpectedly stale, or an expected story is missing | Confirm you ran `run-pia.bat` (fetches) and not `run-pia-web.bat` (read-only viewer) — check its startup banner and the printed checkpoint/source list. See [docs/sources.md](docs/sources.md) if the story is from a provider PIA does not watch |
 | `pia web` says it needs extra packages | `pip install -e ".[web]"` |
 | Web page is empty | Run `pia` first to create a briefing, then refresh (or try the demo above) |
 | `--triage jev` says the key or profile is missing | Add `TYPESAFE_API_KEY` to `.env` and create `config/interests.toml`; `pia doctor --online` checks both |
