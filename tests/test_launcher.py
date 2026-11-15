@@ -1,11 +1,9 @@
 """The double-click launcher exists because a bare `pia.exe` window closes the moment it finishes.
 
-`run-pia.bat` with no arguments now runs the pipeline and, only on success, starts the web UI. That
-real path needs real network, real API keys and a real briefing, none of which a test may use — so it
-is exercised here against a STUB `pia.exe` (a small .bat) that the launcher runs instead, via the
-`PIA_EXE`/`PIA_PYTHON` overrides it reads for exactly this purpose. The stub records what it was
-called with, so the tests assert on what the launcher actually did (which command ran, in what order,
-whether the web UI was started), not on the launcher's source text.
+`run-pia.bat` with no arguments starts the app (`pia serve --open`); with arguments it runs only that command.
+The real no-argument path starts a server, so it is exercised here against a STUB `pia.exe` (a small .bat) that
+the launcher runs instead, via the `PIA_EXE`/`PIA_PYTHON` overrides it reads for exactly this purpose. The stub
+records what it was called with, so the tests assert on what the launcher actually did, not on its source text.
 """
 
 import subprocess
@@ -34,16 +32,15 @@ def run(*args: str, timeout=60, env=None):
     )
 
 
-def write_stub_pia(tmp_path: Path, *, no_args_exit: int, calls_log: Path) -> Path:
-    """A stub `pia.exe` (really a .bat): records every invocation to `calls_log`, one line per call.
-    Exits `no_args_exit` when called with no arguments (simulating the pipeline); when called with
-    `web --open` it records the call and exits 0 immediately, so the test never waits for a real server."""
+def write_stub_pia(tmp_path: Path, *, serve_exit: int, calls_log: Path) -> Path:
+    """A stub `pia.exe` (really a .bat): records every invocation to `calls_log`, one line per call, and exits
+    `serve_exit` when called with `serve --open` (so the test never waits for a real server); 0 otherwise."""
     stub = tmp_path / "stub_pia.bat"
     stub.write_text(
         "@echo off\r\n"
         f'echo CALLED:%*>> "{calls_log}"\r\n'
-        'if "%~1"=="" (\r\n'
-        f"  exit /b {no_args_exit}\r\n"
+        'if "%~1"=="serve" (\r\n'
+        f"  exit /b {serve_exit}\r\n"
         ")\r\n"
         "exit /b 0\r\n",
         encoding="ascii",
@@ -51,10 +48,10 @@ def write_stub_pia(tmp_path: Path, *, no_args_exit: int, calls_log: Path) -> Pat
     return stub
 
 
-def write_stub_python(tmp_path: Path) -> Path:
-    """A stub `python.exe` standing in for the `import fastapi, uvicorn` package check: always succeeds."""
-    stub = tmp_path / "stub_python.bat"
-    stub.write_text("@echo off\r\nexit /b 0\r\n", encoding="ascii")
+def write_stub_python(tmp_path: Path, exit_code: int = 0) -> Path:
+    """A stub `python.exe` standing in for the `import fastapi, uvicorn` package check."""
+    stub = tmp_path / f"stub_python_{exit_code}.bat"
+    stub.write_text(f"@echo off\r\nexit /b {exit_code}\r\n", encoding="ascii")
     return stub
 
 
@@ -69,95 +66,39 @@ def test_propagates_the_exit_code_of_pia(tmp_path):
     assert result.returncode == 1
 
 
-def test_arguments_skip_the_pipeline_and_web_ui_sequence_entirely(tmp_path):
-    """`run-pia.bat status` must run ONLY `pia status` - never the pipeline, never the web UI."""
+def test_arguments_run_only_that_command_and_never_start_the_app(tmp_path):
     calls_log = tmp_path / "calls.log"
-    stub = write_stub_pia(tmp_path, no_args_exit=0, calls_log=calls_log)
-    result = run("status", env={"PIA_EXE": str(stub)})
+    stub = write_stub_pia(tmp_path, serve_exit=0, calls_log=calls_log)
+    result = run("run-once", "--no-fetch", env={"PIA_EXE": str(stub)})
     assert result.returncode == 0
-    assert calls_log.read_text().strip() == "CALLED:status"
+    assert calls_log.read_text().strip() == "CALLED:run-once --no-fetch"
 
 
-# ---------- A: the pipeline succeeds -> the web UI starts ----------
-
-
-def test_a_successful_pipeline_starts_the_web_ui(tmp_path):
+def test_a_double_click_starts_the_app_with_its_agent_and_opens_the_browser(tmp_path):
     calls_log = tmp_path / "calls.log"
-    pia_stub = write_stub_pia(tmp_path, no_args_exit=0, calls_log=calls_log)
-    python_stub = write_stub_python(tmp_path)
-
-    result = run(env={"PIA_EXE": str(pia_stub), "PIA_PYTHON": str(python_stub)})
-
+    result = run(env={"PIA_EXE": str(write_stub_pia(tmp_path, serve_exit=0, calls_log=calls_log)), "PIA_PYTHON": str(write_stub_python(tmp_path))})
     assert result.returncode == 0
-    calls = calls_log.read_text().splitlines()
-    assert calls == ["CALLED:", "CALLED:web --open"], calls  # pipeline (no args), then the web UI, in order
-    assert "PIPELINE STARTING" in result.stdout
-    assert "PIPELINE COMPLETE" in result.stdout
-    assert "WEB UI STARTING" in result.stdout
-    assert "FAILED" not in result.stdout
+    assert calls_log.read_text().splitlines() == ["CALLED:serve --open"]
+    assert "background agent" in result.stdout and "error" not in result.stdout.lower()
 
 
-# ---------- B: the pipeline fails -> the web UI does NOT start ----------
-
-
-def test_a_failing_pipeline_does_not_start_the_web_ui(tmp_path):
+def test_a_failed_start_is_reported_with_its_exit_code(tmp_path):
     calls_log = tmp_path / "calls.log"
-    pia_stub = write_stub_pia(tmp_path, no_args_exit=1, calls_log=calls_log)
-    python_stub = write_stub_python(tmp_path)
-
-    result = run(env={"PIA_EXE": str(pia_stub), "PIA_PYTHON": str(python_stub)})
-
-    assert result.returncode == 1
-    calls = calls_log.read_text().splitlines()
-    assert calls == ["CALLED:"]  # only the pipeline attempt - the web UI was never invoked
-    assert "PIPELINE STARTING" in result.stdout
-    assert "PIPELINE FAILED" in result.stdout
-    assert "exit code 1" in result.stdout
-    assert "WEB UI STARTING" not in result.stdout
+    result = run(env={"PIA_EXE": str(write_stub_pia(tmp_path, serve_exit=3, calls_log=calls_log)), "PIA_PYTHON": str(write_stub_python(tmp_path))})
+    assert result.returncode == 3
+    assert "exit code 3" in result.stdout
 
 
-def test_a_missing_web_extra_is_reported_and_does_not_start_the_web_ui(tmp_path):
-    """The package check runs after a successful pipeline; if it fails, the web UI still must not start."""
+def test_missing_web_packages_are_explained_and_nothing_is_started(tmp_path):
     calls_log = tmp_path / "calls.log"
-    pia_stub = write_stub_pia(tmp_path, no_args_exit=0, calls_log=calls_log)
-    failing_python = tmp_path / "failing_python.bat"
-    failing_python.write_text("@echo off\r\nexit /b 1\r\n", encoding="ascii")
-
-    result = run(env={"PIA_EXE": str(pia_stub), "PIA_PYTHON": str(failing_python)})
-
+    result = run(env={"PIA_EXE": str(write_stub_pia(tmp_path, serve_exit=0, calls_log=calls_log)), "PIA_PYTHON": str(write_stub_python(tmp_path, 1))})
     assert result.returncode == 1
-    assert calls_log.read_text().splitlines() == ["CALLED:"]  # pipeline ran; web UI did not
+    assert not calls_log.exists()
     assert 'pip install -e ".[web]"' in result.stdout
 
 
-def test_only_pauses_after_the_pipeline_or_web_ui_step_not_for_scriptable_arguments():
+def test_only_the_double_click_path_pauses():
     text = BAT.read_text()
-    # `if not "%~1"=="" goto :passthrough` returns early (no pause) for the scriptable, argument-taking
-    # path; every `pause` comes later, on the no-arguments (double-click) pipeline/web-UI path.
     early_return = text.index('if not "%~1"==""')
-    first_pause = text.index("pause", early_return)
-    assert early_return < first_pause
-    assert text.count("pause") >= 2  # one for the failure path, one after the web UI stops
-
-
-# ---------- web launcher ----------
-
-WEB_BAT = Path(__file__).parent.parent / "run-pia-web.bat"
-
-
-def run_web(*args: str, timeout=60):
-    return subprocess.run(
-        ["cmd", "/c", str(WEB_BAT), *args], capture_output=True, text=True, encoding="utf-8", timeout=timeout, stdin=subprocess.DEVNULL
-    )
-
-
-def test_the_web_launcher_passes_arguments_through_to_pia_web_without_starting_a_server():
-    result = run_web("--help")  # `pia web --open --help` prints help and exits; a real start would hit the timeout
-    assert result.returncode == 0
-    assert "local web UI" in result.stdout and "--port" in result.stdout
-
-
-def test_the_web_launcher_opens_the_browser_and_only_pauses_without_arguments():
-    text = WEB_BAT.read_text()
-    assert "web --open" in text
-    assert 'if "%~1"==""' in text and text.index('if "%~1"==""') < text.index("pause", text.index('if "%~1"==""'))
+    assert early_return < text.index("pause", early_return)  # the scriptable path returns before any pause
+    assert "pause" not in text[text.index(":passthrough") : text.index(":serve")]

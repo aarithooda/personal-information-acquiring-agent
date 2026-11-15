@@ -1,0 +1,26 @@
+# Personal settings that seed PIA's database. Copy to config/personal.toml (git-ignored) and edit.
+# Everything here can also be changed later in the app; this file is only read when the database is seeded
+# (first run) or when you run `pia seed --personal`.
+
+[university]
+# Renames the "University" space, and is used when PIA explains why an opportunity may suit you.
+name = "Example University"
+short = "Example Uni"
+
+[me]
+# Used only for opportunity eligibility ("accepts first-year students?") and in prompts that explain relevance.
+stage = "First-year undergraduate"
+academic_year = 1
+country = "India"
+
+[domains]
+# 0 hides a space from Home, 1 is normal, 1.5 gives it priority. Unlisted spaces stay at 1.
+ai = 1.5
+mathematics = 1.5
+
+[topics]
+# Starting interest levels by topic name (as in config/taxonomy.toml):
+# 3 = priority, 2 = highly interesting, 1 = somewhat, -1 = not interesting, -2 = muted.
+"AI agents" = 3
+"Number theory" = 2
+"Crypto markets" = -1

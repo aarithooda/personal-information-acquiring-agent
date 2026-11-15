@@ -25,6 +25,9 @@ class RawItem(BaseModel):
     content: str | None = None
     published_at: datetime | None = None
     signals: dict = {}  # source-specific popularity data, e.g. {"points": 120}
+    # Optional hints used by the platform pipeline (v1 ignores them).
+    author: str | None = None
+    kind: str | None = None  # what the adapter knows the item to be: "paper", "repo", "opportunity", ...
 
     @field_validator("source", "external_id", "url", "title")
     @classmethod

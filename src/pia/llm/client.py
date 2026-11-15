@@ -61,6 +61,7 @@ class GroqClient:
         self._http = http
         self._url = f"{base_url}/chat/completions"
         self._sleep = sleep
+        self.last_usage: dict | None = None  # token counts of the most recent successful call
 
     def complete_json(
         self,
@@ -104,6 +105,11 @@ class GroqClient:
             )
         except SourceError as exc:
             raise LLMUnavailable(f"Groq request failed: {exc}") from exc
+        try:  # token counts for the platform's cost meter; absent or odd usage is simply not recorded
+            usage = response.json().get("usage") or {}
+            self.last_usage = {"input_tokens": int(usage.get("prompt_tokens", 0)), "output_tokens": int(usage.get("completion_tokens", 0))}
+        except (ValueError, TypeError, AttributeError):
+            self.last_usage = None
         return self._extract_json(response)
 
     @staticmethod

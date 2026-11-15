@@ -1,0 +1,39 @@
+# Which model does which job, and what each costs. Read by src/pia/intel/usage.py.
+#
+# Prices are in US dollars per million tokens and are ESTIMATES for the cost meter on the System page. Providers
+# change prices; check their pricing pages and edit here. Nothing else depends on these numbers.
+#   Groq:  https://groq.com/pricing
+#   Jev:   derived from the measured run in docs/design.md ($0.0345 for 820,795 input tokens)
+
+[providers]
+# Groq is the only external model provider PIA uses. Jev (TypeSafe's decision model) is integrated but DORMANT:
+# while this is false PIA makes no Jev call at all, does not read the Jev key, and ignores any Jev judgement
+# stored earlier when ranking. Set it to true only as a deliberate decision; a key in the environment is not enough.
+jev = false
+
+[tasks]
+assess = "openai/gpt-oss-20b"      # batched significance, topics and one-line summary for new items
+brief = "openai/gpt-oss-120b"      # the full structured explanation, written on demand
+extract = "openai/gpt-oss-120b"    # opportunity fields (deadline, eligibility, ...)
+source_eval = "openai/gpt-oss-120b"
+
+[budget]
+assess_items_per_cycle = 160       # at most this many items are sent for assessment in one worker cycle
+briefs_per_cycle = 12              # briefs written ahead of time for the top of Home
+fit_items_per_cycle = 30           # only used if [providers] jev = true: shortlist size for the Jev personal-fit judgement
+daily_usd = 1.00                   # the worker stops calling models for the day once estimated spend reaches this
+
+[prices."openai/gpt-oss-20b"]
+provider = "groq"
+input = 0.075
+output = 0.30
+
+[prices."openai/gpt-oss-120b"]
+provider = "groq"
+input = 0.15
+output = 0.60
+
+[prices.jev]
+provider = "typesafe"
+input = 0.042
+output = 0.0
