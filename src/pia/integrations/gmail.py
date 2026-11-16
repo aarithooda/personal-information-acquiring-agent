@@ -50,6 +50,7 @@ DEFAULT_KEYWORDS = (
     "call for applications", "call for nominations", "applications open", "applications are invited", "application deadline",
     "last date to apply", "research internship", "research opportunity", "internship opportunity", "pitch competition",
     "coding competition", "programming contest", "student nominations", "presentation competition",
+    "call for participation", "expression of interest", "registrations open", "invitation to submit", "problem statement", "inter iit",
 )
 KEYWORD_BODY_CHARS = 600  # how much of the body a keyword may appear in (the subject always counts)
 # Always dropped, even from a trusted sender: Ph.D. viva-voce notices and the spam-quarantine digest.

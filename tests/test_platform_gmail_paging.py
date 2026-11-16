@@ -125,6 +125,13 @@ def test_decide_trusted_senders_keywords_and_exclusions():
     assert gmail.decide("club@institute.example", "Circular", deep, **rules)[0] is False
     assert gmail.decide("club@institute.example", "Circular", "An internship is announced for first years. " + deep, **rules) == (True, "keyword: internship")
     assert gmail.decide("coordinator-bis@iitr.ac.in", "Re: Presentation competition on collaboration", "", **rules) == (True, "keyword: presentation competition")
+    for subject, word in (("Design for Bharat 2027 / Call for Participation", "call for participation"),
+                          ("Call for Expression of Interest | Student Astronomy Conference", "expression of interest"),
+                          ("Registrations Open ISTC 2027 - Quant & Trading Talent", "registrations open"),
+                          ("Invitation to Submit Research Papers: IRCABF 2027", "invitation to submit"),
+                          ("Recruitment for Mid Prep Problem Statement (Robotics) - Inter IIT Tech Meet", "problem statement")):
+        assert gmail.decide("gensec.technical@iitr.ac.in", subject, "", **rules) == (True, f"keyword: {word}")  # on the keyword path, not trusted
+    assert gmail.decide("gensec.technical@iitr.ac.in", "Headstart Lecture 01: STL", "", **rules)[0] is False
     assert gmail.decide("hec@iitr.ac.in", "HEC: Kedarkantha Trek", "Register now", **rules)[0] is False  # HEC is not excluded, just not a keyword hit
     assert gmail.decide("hec@iitr.ac.in", "HEC hackathon on trekking data", "", **rules)[0] is True
 
