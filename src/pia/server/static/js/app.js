@@ -4,7 +4,7 @@ import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
 import { Library, Search, Space, SpacesIndex, Topic } from "./feeds.js";
 import { ReaderSheet } from "./item.js";
 import { Opportunities } from "./opportunities.js";
-import { Interests, Notifications, Sources, System } from "./pages.js";
+import { Interests, Settings, Sources } from "./manage.js";
 import { Empty, ErrorNote, Icon, IconButton, MarginNote, Meta, NotificationsDrawer, Palette, Row, RowActions, Shortcuts, Skeleton, Toasts, applyTheme, go, hueStyle, itemHref, loadSpaceTops, setReadingContext, toast, useItemActions, useItemSync, useLoad, useTriage } from "./ui.js";
 import { KIND_LABELS, buildRoute, composeBriefing, dueText, foldOpportunities, parseRoute, plural, priorityDomains, reasons, standfirst, timeAgo } from "./util.js";
 
@@ -362,7 +362,7 @@ function App() {
   else if (section === "opportunities") page = html`<${Opportunities} ...${common} />`;
   else if (section === "sources") page = html`<${Sources} ...${common} />`;
   else if (section === "interests") page = html`<${Interests} ...${common} />`;
-  else if (section === "settings") page = route.query.tab === "system" ? html`<${System} ...${common} />` : html`<${Notifications} ...${common} />`;
+  else if (section === "settings") page = html`<${Settings} ...${common} />`;
   else page = html`<div class="page"><${Empty} title="Page not found">The link may be out of date. <a class="textlink" href="#/">Go to Today</a>.<//></div>`;
 
   const dueSoon = opportunities ? foldOpportunities(opportunities.opportunities).filter((o) => o.days_left !== null && o.days_left >= 0 && o.days_left <= 3).length : 0;

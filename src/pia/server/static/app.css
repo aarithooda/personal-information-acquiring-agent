@@ -639,3 +639,32 @@ button.textlink { display: inline; text-align: left; }
 a.ticket { color: inherit; }
 .field.big { height: 48px; font: var(--w-regular) 20px/1 var(--font-serif); }
 .btn.big { height: 48px; }
+.subnav .phone-only { display: none; }
+.page-head.flush { padding-top: 0; }
+.feed-note.flush { padding: 0; }
+.meta.inline { display: inline; }
+table.grid.narrow { max-width: 420px; }
+table.grid b.name { font-weight: var(--w-semibold); }
+.field.cap { width: 72px; height: 30px; text-align: right; }
+.field.time { max-width: 120px; flex: 0 0 auto; }
+.field.token { font-family: ui-monospace, Consolas, monospace; }
+.health.block { display: flex; }
+.chip.static { cursor: default; }
+.chip.static:hover { border-color: var(--rule-strong); color: var(--ink-2); }
+.notes { display: grid; gap: var(--s-2); font-size: 14px; color: var(--ink-2); grid-column: 1; }
+.notes li { position: relative; padding-left: var(--s-5); }
+.notes li::before { content: ""; position: absolute; left: 2px; top: 0.7em; width: 8px; height: 1px; background: var(--ink-3); }
+.cand .chips.matched { grid-column: 1; }
+.settings-layout .callout { margin-bottom: var(--s-4); }
+.settings-layout .callout .notes { margin: var(--s-3) 0; }
+@media (max-width: 899px) { .subnav .phone-only { display: flex; } .subnav a { white-space: nowrap; } }
+table.grid.sources { table-layout: fixed; }
+table.grid.sources th:nth-child(1) { width: 31%; }
+table.grid.sources th:nth-child(2) { width: 13%; }
+table.grid.sources th:nth-child(3) { width: 26%; }
+table.grid.sources th:nth-child(4), table.grid.sources th:nth-child(5) { width: 8%; }
+table.grid.sources td { overflow: hidden; text-overflow: ellipsis; }
+table.grid.sources td .sub { max-width: 100%; }
+.panel.top { padding-top: var(--s-6); }
+.field.time { min-width: 0; width: 120px; }
+@media (max-width: 899px) { table.grid tr .row-acts { opacity: 1; } }
