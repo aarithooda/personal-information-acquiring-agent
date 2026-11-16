@@ -186,8 +186,10 @@ def message_to_item(message: dict, source: str) -> RawItem | None:
     text = body_text(message.get("payload") or {}) or clean_text(message.get("snippet", ""))
     return make_item(
         source=source, external_id=message.get("id"),
-        # A stable address that opens the message in the owner's own Gmail. It identifies the message; it grants nothing.
-        url=f"https://mail.google.com/mail/u/0/#all/{message.get('threadId') or message.get('id')}",
+        # An address that opens the message in the owner's own Gmail; it grants nothing. PIA identifies items by their
+        # canonical URL, which drops the #fragment, so the message id must be in the query or every message would
+        # collapse into one item. Gmail ignores the extra parameter and still opens the thread named in the fragment.
+        url=f"https://mail.google.com/mail/u/0/?pia_message={message.get('id')}#all/{message.get('threadId') or message.get('id')}",
         title=clean_text(headers.get("subject", "")) or "(no subject)", content=text[:MAX_BODY_CHARS] or None, published_at=sent,
         author=sender_name or sender_address or None, kind="announcement", signals={"from": sender_address, "mail": True},
     )

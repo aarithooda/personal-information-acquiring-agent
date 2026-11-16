@@ -321,7 +321,11 @@ def test_a_message_becomes_an_announcement_and_the_query_is_selective():
     assert announcement.title == "Summer internship: applications open" and announcement.author == "Dean, Academics"
     assert announcement.content == "Apply by 1 December 2026. Open to all years." and announcement.kind == "announcement"
     assert announcement.signals == {"from": "dean@institute.example", "mail": True} and announcement.published_at.hour == 4  # converted to UTC
-    assert announcement.url == "https://mail.google.com/mail/u/0/#all/t1"
+    assert announcement.url.endswith("#all/t1") and announcement.url.startswith("https://mail.google.com/mail/u/0/")
+    # Regression: items are identified by canonical URL, which drops the fragment. Two messages must stay two items.
+    from pia.normalize import canonicalize_url
+    other = {**MESSAGE, "id": "another-message", "threadId": "t2"}
+    assert canonicalize_url(announcement.url) != canonicalize_url(gmail.message_to_item(other, "University mail").url)
     html_only = {"id": "m2", "payload": {"headers": [], "mimeType": "text/html", "body": {"data": encode("<p>A workshop on proof assistants will be held on campus next week for everyone.</p>")}}}
     assert "proof assistants" in gmail.message_to_item(html_only, "x").content and gmail.message_to_item(html_only, "x").title == "(no subject)"
     query = gmail.build_query(NOW, ["notices@institute.example", "dean@institute.example"], ["internship", "summer school"])
