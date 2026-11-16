@@ -17,7 +17,10 @@ Design (docs/platform/GMAIL.md has the setup steps and the reasoning):
 import base64
 import hashlib
 import json
+import logging
+import re
 import secrets
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr, parsedate_to_datetime
@@ -37,9 +40,43 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
 TOKEN_FILE = PROJECT_ROOT / "data" / "secrets" / "gmail.json"
+log = logging.getLogger(__name__)
 MAX_BODY_CHARS = 6000
-DEFAULT_KEYWORDS = ("internship", "fellowship", "scholarship", "hackathon", "competition", "workshop", "summer school", "applications",
-                    "registration", "deadline", "opportunity", "research project", "call for", "notice", "seminar", "talk")
+# Two ways a message gets in. (1) A TRUSTED SENDER: an exact address the owner has verified; everything from it is
+# inspected. (2) A SPECIFIC KEYWORD from anyone else. Single generic words ("notice", "registration", "opportunity", "talk",
+# "workshop") are deliberately absent: on a university mailbox they match routine circulars and flood the results.
+DEFAULT_KEYWORDS = (
+    "internship", "fellowship", "scholarship", "hackathon", "datathon", "summer school", "summer research", "call for papers",
+    "call for applications", "call for nominations", "applications open", "applications are invited", "application deadline",
+    "last date to apply", "research internship", "research opportunity", "internship opportunity", "pitch competition",
+    "coding competition", "programming contest", "student nominations", "presentation competition",
+    "call for participation", "expression of interest", "registrations open", "invitation to submit", "problem statement", "inter iit",
+)
+KEYWORD_BODY_CHARS = 600  # how much of the body a keyword may appear in (the subject always counts)
+# Always dropped, even from a trusted sender: Ph.D. viva-voce notices and the spam-quarantine digest.
+DEFAULT_EXCLUDE_SUBJECTS = ("viva", "quarantined emails")
+DEFAULT_EXCLUDE_SENDERS = ("noreply-emailsupport@iitr.ac.in",)
+SLICE = timedelta(days=1)  # mail is read one day at a time, oldest first, so the cursor can only move over finished days
+LIST_PAGE_SIZE = 100
+MAX_LIST_PAGES = 50  # per day: 5,000 matching messages in one day would mean the filters are wrong, and fails loudly
+
+
+RATE_LIMIT_WAITS = (2, 5, 12)  # seconds; Gmail reports transient per-user rate limiting as HTTP 403 as well as 429
+_sleep = time.sleep
+
+
+def _get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
+    """A GET that also waits out Gmail's transient 403 rate limits, which the shared retry layer (429 and 5xx only) does not.
+    A 403 that persists (for example a revoked permission) still fails after the last wait. Only ever GET: mail is only read."""
+    for wait in (*RATE_LIMIT_WAITS, None):
+        try:
+            return request_with_retry(client, "GET", url, **kwargs)
+        except SourceError as exc:
+            if exc.status != 403 or wait is None:
+                raise
+            log.warning("%s: HTTP 403 (usually Gmail rate limiting), retrying in %ds", url, wait)
+            _sleep(wait)
+    raise AssertionError("unreachable")
 
 
 class GmailNotConnected(SourceError):
@@ -133,9 +170,13 @@ def access_token(client: httpx.Client, now: datetime, path: Path = TOKEN_FILE) -
 # ---------- reading ----------
 
 
-def build_query(since: datetime, senders: list[str], keywords: list[str], extra: str = "") -> str:
-    """A Gmail search: recent mail from the listed senders, OR recent mail mentioning a keyword."""
-    parts = [f"after:{int(since.timestamp())}", "-in:chats", "-in:spam", "-in:trash"]
+def build_query(since: datetime, senders: list[str], keywords: list[str], extra: str = "", *, until: datetime | None = None,
+                exclude_subjects: tuple | list = (), exclude_senders: tuple | list = ()) -> str:
+    """A Gmail search: mail in [since, until) from a trusted sender, OR mentioning a keyword, minus the exclusions."""
+    parts = [f"after:{int(since.timestamp())}"]
+    if until is not None:
+        parts.append(f"before:{int(until.timestamp())}")
+    parts += ["-in:chats", "-in:spam", "-in:trash"]
     clauses = []
     if senders:
         clauses.append("from:(" + " OR ".join(sender.strip() for sender in senders if sender.strip()) + ")")
@@ -143,9 +184,36 @@ def build_query(since: datetime, senders: list[str], keywords: list[str], extra:
         clauses.append("(" + " OR ".join(f'"{word}"' if " " in word else word for word in keywords) + ")")
     if clauses:
         parts.append("{" + " ".join(clauses) + "}")  # Gmail's braces mean OR
+    for word in exclude_subjects:
+        parts.append(f'-subject:"{word}"' if " " in word else f"-subject:{word}")
+    for address in exclude_senders:
+        parts.append(f"-from:{address}")
     if extra:
         parts.append(extra)
     return " ".join(parts)
+
+
+def decide(sender: str, subject: str, text: str, *, senders=(), keywords=(), exclude_subjects=(), exclude_senders=()) -> tuple[bool, str]:
+    """Whether a message is kept, and why. The Gmail search narrows what is downloaded; this is the rule that is enforced,
+    because Gmail's matching is fuzzy about punctuation and word forms. It is also what the dry run uses."""
+    address = (sender or "").strip().lower()
+    if address in {entry.strip().lower() for entry in exclude_senders}:
+        return False, "excluded sender"
+    subject_lower = (subject or "").lower()
+    for word in exclude_subjects:
+        if re.search(rf"\b{re.escape(word.lower())}\b", subject_lower):  # whole words: "viva" must not match "revival"
+            return False, f"excluded subject ({word})"
+    for entry in senders:
+        entry = entry.strip().lower()
+        if entry and (address == entry or (entry.startswith("@") and address.endswith(entry))):
+            return True, "trusted sender"
+    # A keyword counts in the subject or the opening of the body. A long circular that mentions "internship" in its tenth
+    # paragraph, or a fee-waiver list that says "scholarship", is not an announcement about one.
+    haystack = f"{subject_lower} {(text or '')[:KEYWORD_BODY_CHARS].lower()}"
+    for word in keywords:
+        if word.lower() in haystack:
+            return True, f"keyword: {word}"
+    return False, "no trusted sender, no keyword"
 
 
 def _decode(data: str) -> str:
@@ -200,20 +268,93 @@ class GmailSource:
     name: str
     senders: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=lambda: list(DEFAULT_KEYWORDS))
+    exclude_subjects: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE_SUBJECTS))
+    exclude_senders: list[str] = field(default_factory=lambda: list(DEFAULT_EXCLUDE_SENDERS))
     query: str = ""
-    max_messages: int = 40
+    max_messages: int = 100  # a per-run budget of message bodies to read, NOT a cap on what is acquired: see fetch()
     state: dict = field(default_factory=dict)
     token_file: str = ""
+    dropped: int = 0  # messages downloaded but rejected by `decide` in the last fetch (for logs and the dry run)
+
+    def _query(self, start: datetime, end: datetime) -> str:
+        # One second of overlap with the neighbouring day, in case Gmail treats after:/before: as exclusive at the boundary;
+        # `seen` removes the duplicate, so a message dated exactly on a boundary can never fall between two days.
+        return build_query(start - timedelta(seconds=1), self.senders, self.keywords, self.query, until=end + timedelta(seconds=1),
+                           exclude_subjects=self.exclude_subjects, exclude_senders=self.exclude_senders)
+
+    def _list_ids(self, client: httpx.Client, headers: dict, start: datetime, end: datetime) -> list[str]:
+        """Every matching message id in [start, end), following nextPageToken to the end."""
+        ids: list[str] = []
+        token = None
+        for _ in range(MAX_LIST_PAGES):
+            params = {"q": self._query(start, end), "maxResults": LIST_PAGE_SIZE}
+            if token:
+                params["pageToken"] = token
+            listing = _get(client, f"{API}/messages", headers=headers, params=params).json()
+            ids += [reference["id"] for reference in listing.get("messages", [])]
+            token = listing.get("nextPageToken")
+            if not token:
+                return ids
+        raise SourceError(f"more than {MAX_LIST_PAGES * LIST_PAGE_SIZE} messages match in one day: the filters are too broad")
+
+    def _read_day(self, client: httpx.Client, headers: dict, start: datetime, end: datetime, seen: set[str]) -> tuple[list[RawItem], int]:
+        """Read and filter one finished slice. Raises if any message in it cannot be read, so the slice is retried whole."""
+        items: list[RawItem] = []
+        read = 0
+        for message_id in self._list_ids(client, headers, start, end):
+            if message_id in seen:
+                continue  # also returned for the previous slice's boundary
+            try:
+                message = _get(client, f"{API}/messages/{message_id}", headers=headers, params={"format": "full"}).json()
+            except SourceError as exc:
+                if exc.status == 404:
+                    continue  # deleted between listing and reading: nothing to acquire
+                raise
+            seen.add(message_id)
+            read += 1
+            item = message_to_item(message, self.name)
+            if item is None:
+                continue
+            keep, _ = decide(item.signals.get("from", ""), item.title, item.content or "", senders=self.senders, keywords=self.keywords,
+                             exclude_subjects=self.exclude_subjects, exclude_senders=self.exclude_senders)
+            if keep:
+                items.append(item)
+            else:
+                self.dropped += 1
+        return items, read
 
     def fetch(self, client: httpx.Client, since: datetime, until: datetime) -> list[RawItem]:
+        """Read [since, until) one day at a time, oldest first, following every page of results.
+
+        The runner's cursor must never move past a message that was not processed. So this records, in `state`, how far it
+        got: `fetched_until` is the end of the last day that was read completely. After `max_messages` bodies it stops at
+        a day boundary and sets `more`, and the next run continues from there (the runner reads both). A failure part-way
+        through a day abandons that whole day (items already read stay; the cursor stays before it). Items are stored by
+        canonical URL, so reading a day twice does no harm."""
         path = Path(self.token_file) if self.token_file else TOKEN_FILE
         headers = {"Authorization": f"Bearer {access_token(client, until, path)}"}
-        listing = request_with_retry(client, "GET", f"{API}/messages", headers=headers,
-                                     params={"q": build_query(since, self.senders, self.keywords, self.query), "maxResults": self.max_messages}).json()
-        items = []
-        for reference in listing.get("messages", [])[: self.max_messages]:
-            message = request_with_retry(client, "GET", f"{API}/messages/{reference['id']}", headers=headers, params={"format": "full"}).json()
-            item = message_to_item(message, self.name)
-            if item:
-                items.append(item)
+        self.dropped = 0
+        items: list[RawItem] = []
+        seen: set[str] = set()
+        position, budget = since, 0
+        while position < until:
+            end = min(position + SLICE, until)
+            try:
+                day_items, read = self._read_day(client, headers, position, end, seen)
+            except SourceError as exc:
+                if position == since:
+                    raise  # nothing finished: report the failure, the cursor does not move
+                # Keep what was finished, stop before the broken day, and wait the normal interval (not "call again at once"):
+                # a message that keeps failing must not be retried every minute. The runner shows `warning` on the source,
+                # so a stalled cursor is visible instead of the source looking healthy.
+                self.state = {"fetched_until": position.isoformat(), "more": False,
+                              "warning": f"Stopped before {position:%Y-%m-%d}: mail from that day could not be read ({str(exc)[:160]}). Newer mail waits."}
+                return items
+            items += day_items
+            budget += read
+            position = end
+            if budget >= self.max_messages and position < until:
+                self.state = {"fetched_until": position.isoformat(), "more": True}
+                return items
+        self.state = {"fetched_until": until.isoformat(), "more": False}
         return items
