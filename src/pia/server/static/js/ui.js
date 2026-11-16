@@ -87,6 +87,19 @@ export function useItemSync(patchItems) {
   }, [patchItems]);
 }
 
+// The top unread headlines of each space, kept for a minute (Today and the Spaces index share them).
+const spaceTops = new Map();
+export function loadSpaceTops(slugs) {
+  return Promise.all(slugs.map((slug) => {
+    const cached = spaceTops.get(slug);
+    if (!cached || Date.now() - cached.at > 60000) {
+      const promise = api.items({ domain: slug, view: "important", state: "unread", limit: 3 }).then((page) => page.items, () => { spaceTops.delete(slug); return []; });
+      spaceTops.set(slug, { at: Date.now(), promise });
+    }
+    return spaceTops.get(slug).promise.then((items) => [slug, items]);
+  })).then((pairs) => Object.fromEntries(pairs));
+}
+
 // ---------- loading ----------
 
 // Load something, track loading and error, and allow a reload.

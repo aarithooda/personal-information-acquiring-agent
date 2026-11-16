@@ -1,11 +1,11 @@
 // The shell: session, routing, navigation and the overlays. Pages live in their own modules.
 import { html, render, useCallback, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
-import { Feed, Home, TopicPage } from "./legacy.js";
+import { Feed, TopicPage } from "./legacy.js";
 import { ReaderSheet } from "./item.js";
 import { Interests, Notifications, Opportunities, Sources, System } from "./pages.js";
-import { Empty, Icon, IconButton, NotificationsDrawer, Palette, Shortcuts, Toasts, applyTheme, go, hueStyle } from "./ui.js";
-import { buildRoute, foldOpportunities, parseRoute, priorityDomains, timeAgo } from "./util.js";
+import { Empty, ErrorNote, Icon, IconButton, MarginNote, Meta, NotificationsDrawer, Palette, Row, RowActions, Shortcuts, Skeleton, Toasts, applyTheme, go, hueStyle, itemHref, loadSpaceTops, setReadingContext, toast, useItemActions, useItemSync, useLoad, useTriage } from "./ui.js";
+import { KIND_LABELS, buildRoute, composeBriefing, dueText, foldOpportunities, parseRoute, plural, priorityDomains, reasons, standfirst, timeAgo } from "./util.js";
 
 // Old addresses that still work: the browser history keeps Back honest because these replace the address.
 const REDIRECTS = {
@@ -122,6 +122,182 @@ function SignIn({ onDone }) {
   </form></main>`;
 }
 
+// ---------- Today ----------
+
+const norm = (text) => (text || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+function Masthead({ boot, briefing, loading, opps }) {
+  const now = new Date();
+  const hour = now.getHours();
+  const newCount = boot.domains.reduce((sum, domain) => sum + domain.new_today, 0);
+  const parts = standfirst(newCount, briefing.length, opps);
+  const run = boot.agent.last_run;
+  return html`<header class="masthead">
+    <div>
+      <h1>${now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })}</h1>
+      <p class="standfirst">PIA read <b class="num">${parts.count}</b> ${parts.noun} since yesterday${loading ? "." : html` and chose <b>${parts.chosen}</b> for you.`}
+        ${parts.link && html` <a class="textlink" href=${buildRoute([], { item: parts.link.id })}>${parts.link.label}</a> ${parts.link.tail}`}</p>
+    </div>
+    <div class="edition"><b>${hour < 12 ? "Morning" : hour < 17 ? "Afternoon" : "Evening"} edition</b>
+      ${run && run.finished_at && html`<span>Updated ${timeAgo(run.finished_at)}</span>`}</div>
+  </header>`;
+}
+
+function OnboardingBanner({ boot, refreshBoot }) {
+  const onboarding = boot.onboarding;
+  if (onboarding.dismissed || onboarding.rated >= 10) return null;
+  return html`<div class="onboard"><span><b>Rankings use starting weights.</b> Rate ten topics you recognise and tomorrow's briefing will reflect you. It takes about two minutes.</span>
+    <div class="acts"><a class="btn small primary" href="#/interests?tab=rate">Rate topics</a>
+      <button class="btn small quiet" onClick=${() => api.dismissOnboarding().then(refreshBoot, (failure) => toast(failure.message, { error: true }))}>Not now</button></div></div>`;
+}
+
+function Briefing({ items, cursor, act, route, opps, onMarkRead }) {
+  const read = items.filter((item) => item.read).length;
+  return html`<div>
+    <ol class="briefing" aria-label="Today's briefing, in order of priority">
+      ${items.map((item, index) => {
+        const opp = item.kind === "opportunity" ? opps.get(item.id) : null;
+        const days = opp && opp.days_left;
+        return html`<li class=${"entry" + (index === 0 ? " lead" : "") + (item.read ? " read" : "") + (cursor === index ? " cursor" : "")} key=${item.id} data-id=${item.id}>
+          <span class="ord" aria-hidden="true">${index + 1}</span>
+          <div class="body">
+            <${Meta} item=${item} extra=${opp && days >= 0 ? html`<span class=${"due" + (days <= 2 ? " hot" : "")}>${dueText(days)}</span>` : null} />
+            <h2><a href=${itemHref(route, item.id)}>${item.title}</a></h2>
+            ${item.summary && html`<p class="sum">${item.summary}</p>`}
+            <${RowActions} item=${item} act=${act} />
+          </div>
+          <${MarginNote} reasons=${reasons(item, opp)} />
+        </li>`;
+      })}
+    </ol>
+    <div class="briefing-end"><div>
+      <span class="progress" role="img" aria-label=${`${read} of ${items.length} read`}>${items.map((item) => html`<i class=${item.read ? "on" : ""}></i>`)}</span>
+      <span>${read === items.length ? "You have read today's briefing." : `${read} of ${items.length} read`}</span>
+      ${read < items.length && html`<button class="textlink" onClick=${onMarkRead}>Mark briefing read</button>`}
+    </div></div>
+  </div>`;
+}
+
+function DeadlineScale({ opps, route }) {
+  const today = new Date();
+  const days = Array.from({ length: 14 }, (_, index) => new Date(today.getFullYear(), today.getMonth(), today.getDate() + index));
+  const byDay = {};
+  for (const o of opps) if (o.days_left !== null && o.days_left >= 0 && o.days_left < 14) (byDay[o.days_left] ||= []).push(o);
+  const undated = opps.filter((o) => o.days_left === null).length;
+  const dated = opps.filter((o) => o.days_left !== null && o.days_left >= 0 && o.days_left < 14).length;
+  return html`<div>
+    <div class="scale" role="list">
+      ${days.map((day, index) => html`<div role="listitem" class=${"day" + (index === 0 ? " today" : "") + ([0, 6].includes(day.getDay()) ? " weekend" : "")}>
+        <span class="d">${index === 0 ? "Today" : day.toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}</span>
+        ${(byDay[index] || []).slice(0, 3).map((o) => html`<a class=${"dl" + (index <= 2 ? " hot" : "")} href=${itemHref(route, o.item_id)} title=${`${o.programme || o.title}, ${o.organisation || o.source_name}`}>${o.programme || o.title}</a>`)}
+        ${(byDay[index] || []).length > 3 && html`<span>+${byDay[index].length - 3} more</span>`}
+      </div>`)}
+    </div>
+    ${dated === 0 && html`<p class="undated">No dated opportunities in the next two weeks. <a class="textlink" href="#/opportunities">Browse opportunities</a>.</p>`}
+    ${undated > 0 && html`<p class="undated">${plural(undated, "open opportunity", "open opportunities")} ${undated === 1 ? "has" : "have"} no stated deadline. <a class="textlink" href="#/opportunities">See them in Opportunities</a>.</p>`}
+  </div>`;
+}
+
+function LeadingInSpaces({ boot, tops, shownIds, route }) {
+  const spaces = [...boot.domains].filter((domain) => domain.weight > 0).sort((a, b) => b.weight - a.weight).slice(0, 7);
+  const headlines = new Set();
+  const lines = spaces.map((domain) => {
+    const top = (tops[domain.slug] || []).find((item) => !item.spam && !shownIds.has(item.id) && !(item.kind === "repo" && !((item.signals && item.signals.stars) >= 1000)) && !headlines.has(norm(item.title).slice(0, 24)));
+    if (top) headlines.add(norm(top.title).slice(0, 24));
+    return { domain, top };
+  });
+  return html`<section class="section" aria-labelledby="sp-h">
+    <div class="section-head"><h2 id="sp-h">Leading in your spaces</h2><span class="grow"></span><a href="#/spaces">All spaces</a></div>
+    <div class="spaces-index one">${lines.map(({ domain, top }) => html`<div class="space-line" style=${hueStyle(domain.hue)}><span class="swatch"></span><a href=${buildRoute(["space", domain.slug])}><b>${domain.short}</b></a>
+      ${top && html`<a class="top" href=${itemHref(route, top.id)}>${top.title}</a>`}</div>`)}</div>
+  </section>`;
+}
+
+function SavedForLater({ saved, act, route }) {
+  return html`<section class="section" aria-labelledby="sv-h">
+    <div class="section-head"><h2 id="sv-h">Saved for later</h2><span class="grow"></span><a href="#/library">Library</a></div>
+    ${saved === null ? html`<${Skeleton} rows=${1} />` : saved.length === 0
+      ? html`<p class="feed-note">Nothing saved yet. Press <kbd>S</kbd> on any item, or use the bookmark, and it waits here and in your Library.</p>`
+      : html`<ul class="feed">${saved.slice(0, 4).map((item) => html`<li class="line compact" key=${item.id}><div class="t"><a href=${itemHref(route, item.id)}>${item.title}</a><small>${KIND_LABELS[item.kind]}  ·  ${item.source}</small></div><${RowActions} item=${item} act=${act} /></li>`)}</ul>`}
+  </section>`;
+}
+
+function Today({ boot, refreshBoot, route, opportunities }) {
+  const home = useLoad(() => api.home(), [boot.agent.last_run && boot.agent.last_run.finished_at]);
+  const more = useLoad(() => api.items({ view: "important", state: "unread", limit: 8, offset: 0 }), []);
+  const savedList = useLoad(() => api.items({ state: "saved", limit: 4 }), []);
+  const spaces = [...boot.domains].filter((domain) => domain.weight > 0).sort((a, b) => b.weight - a.weight).slice(0, 7);
+  const tops = useLoad(() => loadSpaceTops(spaces.map((domain) => domain.slug)), [spaces.map((domain) => domain.slug).join()]);
+  const [extra, setExtra] = useState({ items: [], hasMore: null, busy: false });
+
+  const patchItems = useCallback((id, change) => {
+    const apply = (list) => list.map((item) => (item.id === id ? { ...item, ...change } : item));
+    home.patch((current) => current && { ...current, featured: apply(current.featured) });
+    more.patch((current) => current && { ...current, items: apply(current.items) });
+    savedList.patch((current) => current && { ...current, items: apply(current.items) });
+    tops.patch((current) => current && Object.fromEntries(Object.entries(current).map(([slug, list]) => [slug, apply(list)])));
+    setExtra((current) => ({ ...current, items: apply(current.items) }));
+  }, [home.patch, more.patch, savedList.patch, tops.patch]);
+  useItemSync(patchItems);
+  const baseAct = useItemActions(patchItems, refreshBoot);
+  const act = useCallback(async (item, change) => { await baseAct(item, change); if ("saved" in change) savedList.reload(); }, [baseAct, savedList.reload]);
+
+  const briefing = home.data ? composeBriefing(home.data.featured) : [];
+  const briefIds = new Set(briefing.map((item) => item.id));
+  const opps = opportunities ? foldOpportunities(opportunities.opportunities) : [];
+  const oppById = new Map(opps.map((o) => [o.item_id, o]));
+  const moreItems = [...(more.data ? more.data.items : []), ...extra.items].filter((item) => !briefIds.has(item.id) && !item.dismissed && !item.spam);
+  const hasMore = extra.hasMore === null ? Boolean(more.data && more.data.has_more) : extra.hasMore;
+  const offset = (more.data ? more.data.items.length : 0) + extra.items.length;
+  const showMore = () => {
+    setExtra((current) => ({ ...current, busy: true }));
+    api.items({ view: "important", state: "unread", limit: 8, offset }).then(
+      (page) => setExtra((current) => ({ items: [...current.items, ...page.items], hasMore: page.has_more, busy: false })),
+      (failure) => { setExtra((current) => ({ ...current, busy: false })); toast(failure.message, { error: true }); },
+    );
+  };
+  const href = (item) => itemHref(route, item.id);
+  const [cursor] = useTriage(briefing, act, href);
+  useEffect(() => { setReadingContext(briefing.map((item) => item.id).concat(moreItems.map((item) => item.id)), "Today"); });
+
+  const markBriefingRead = () => {
+    const unread = briefing.filter((item) => !item.read);
+    api.markRead(unread.map((item) => item.id)).then(() => { unread.forEach((item) => patchItems(item.id, { read: true })); refreshBoot(); toast("Briefing marked as read"); },
+      (failure) => toast(failure.message, { error: true }));
+  };
+  const nothingYet = boot.counts.items === 0;
+  const dated = opps.filter((o) => o.days_left !== null && o.days_left >= 0 && o.days_left < 14).length;
+
+  return html`<div class="page">
+    <${Masthead} boot=${boot} briefing=${briefing} loading=${home.loading && !home.data} opps=${opps} />
+    <${OnboardingBanner} boot=${boot} refreshBoot=${refreshBoot} />
+    ${home.loading && !home.data && html`<${Skeleton} rows=${4} />`}
+    ${home.error && html`<div class="pad-top"><${ErrorNote} message=${home.error} retry=${home.reload} /></div>`}
+    ${home.data && briefing.length > 0 && html`<${Briefing} items=${briefing} cursor=${cursor} act=${act} route=${route} opps=${oppById} onMarkRead=${markBriefingRead} />`}
+    ${home.data && briefing.length === 0 && (nothingYet
+      ? html`<${Empty} title="PIA is gathering its first items" action=${html`<a class="btn" href="#/sources">Check sources</a>`}>Nothing has been acquired yet. Sources shows what PIA is watching.<//>`
+      : html`<${Empty} title="You have read today's briefing" action=${html`<a class="btn" href="#/spaces">Explore your spaces</a>`}>Nothing new has cleared the bar since this morning. PIA checks again on its next cycle.<//>`)}
+
+    <section class="section strip" aria-labelledby="dl-h">
+      <div class="section-head"><h2 id="dl-h">Next two weeks</h2><span class="aside">${plural(dated, "open deadline")}</span><span class="grow"></span><a href="#/opportunities">All opportunities</a></div>
+      <${DeadlineScale} opps=${opps} route=${route} />
+    </section>
+
+    <div class="two-col">
+      <${LeadingInSpaces} boot=${boot} tops=${tops.data || {}} shownIds=${briefIds} route=${route} />
+      <${SavedForLater} saved=${savedList.data ? savedList.data.items.filter((item) => item.saved && !item.dismissed) : savedList.error ? [] : null} act=${act} route=${route} />
+    </div>
+
+    <section class="section" aria-labelledby="mf-h">
+      <div class="section-head"><h2 id="mf-h">More for you</h2><span class="aside">Ranked across every space</span></div>
+      ${more.loading && !more.data && html`<${Skeleton} rows=${3} />`}
+      ${more.error && html`<${ErrorNote} message=${more.error} retry=${more.reload} />`}
+      <ul class="feed">${moreItems.map((item) => html`<${Row} key=${item.id} item=${item} href=${href(item)} act=${act} showSpace=${true} opp=${oppById.get(item.id)} />`)}</ul>
+      ${hasMore && html`<div class="more"><button class="btn" disabled=${extra.busy} onClick=${showMore}>${extra.busy ? "Loading…" : "Show more"}</button></div>`}
+    </section>
+  </div>`;
+}
+
 // ---------- the app ----------
 
 function SpacesStub({ boot }) {  // replaced by the Spaces index in step 6
@@ -181,7 +357,7 @@ function App() {
   const [section, arg] = route.path;
   const common = { boot, refreshBoot, route };
   let page;
-  if (!section) page = html`<${Home} ...${common} />`;
+  if (!section) page = html`<${Today} ...${common} opportunities=${opportunities} />`;
   else if (section === "spaces") page = html`<${SpacesStub} boot=${boot} />`;
   else if (section === "space") {
     const domain = boot.domains.find((entry) => entry.slug === arg);

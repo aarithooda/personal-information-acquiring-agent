@@ -627,3 +627,7 @@ button.textlink { display: inline; text-align: left; }
 .side .note { margin-bottom: var(--s-4); }
 .side .topics a em { margin-left: var(--s-3); }
 .sheet:focus, .drawer:focus, .palette:focus { outline: none; }
+.entry.cursor::before { content: ""; position: absolute; left: calc(-1 * var(--s-5)); top: var(--s-7); bottom: var(--s-7); width: 2px; background: var(--annot); }
+.line.compact { grid-template-columns: minmax(0, 1fr) auto; }
+.spaces-index.one { grid-template-columns: minmax(0, 1fr); }
+.pad-top { padding-top: var(--s-5); }
