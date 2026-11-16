@@ -1,8 +1,9 @@
 // Opportunities, Sources, Interests, Notifications and System.
 import { html, useState } from "../vendor/preact-htm.js";
 import { api } from "./api.js";
-import { Loading } from "./legacy.js";
-import { Empty, ErrorNote, Icon, Segmented, Tabs, hueStyle, toast, useLoad } from "./ui.js";
+import { Empty, ErrorNote, Icon, Segmented, Skeleton, Tabs, hueStyle, toast, useLoad } from "./ui.js";
+
+const Loading = ({ lines = 4 }) => html`<${Skeleton} rows=${Math.ceil(lines / 2)} />`;  // interim, until step 9 rewrites these pages
 import { OPPORTUNITY_TYPES, TRACK_STATUSES, buildRoute, bytes, dateTime, plural, timeAgo, usd } from "./util.js";
 
 function fail(error) {

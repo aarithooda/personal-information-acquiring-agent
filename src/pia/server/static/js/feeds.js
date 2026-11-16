@@ -15,6 +15,7 @@ export function usePagedItems(params) {
   const [state, setState] = useState({ items: [], loading: true, error: null, total: 0, hasMore: false });
   const load = useCallback(async (offset) => {
     const mine = ++turn.current;
+    if (!latest.current) { setState({ items: [], loading: false, error: null, total: 0, hasMore: false }); return; }
     setState((current) => ({ ...current, loading: true, error: null }));
     try {
       const page = await api.items({ ...latest.current, limit: PAGE, offset });
@@ -170,5 +171,91 @@ export function Topic({ refreshBoot, route, id }) {
     ${!feed.loading && !feed.error && !visible.length && html`<${Empty} title="Nothing here yet">PIA has not matched any item to this yet.<//>`}
     <ul class="feed">${visible.map((item, index) => html`<${Row} key=${item.id} item=${item} href=${href(item)} act=${act} cursor=${cursor === index} showSpace=${true} />`)}</ul>
     <${MoreButton} feed=${feed} />
+  </div>`;
+}
+
+// ---------- Library ----------
+
+const LIBRARY = {
+  saved: { params: { state: "saved" }, keep: (item) => item.saved && !item.dismissed },
+  read: { params: { state: "read", view: "latest" }, keep: (item) => item.read && !item.dismissed },
+  dismissed: { params: { state: "dismissed" }, keep: (item) => item.dismissed },
+};
+const LIBRARY_EMPTY = {
+  saved: ["Nothing saved yet", "Save anything worth keeping with the bookmark or the S key. It waits here, on every device you sign in from."],
+  read: ["Nothing read yet", "Items you open appear here, newest first, so you can find something you read last week."],
+  dismissed: ["Nothing dismissed", "Dismissed items leave Today and your feeds. Restore any of them from here."],
+};
+
+export function Library({ boot, refreshBoot, route }) {
+  const tab = LIBRARY[route.query.tab] ? route.query.tab : "saved";
+  const feed = usePagedItems(LIBRARY[tab].params);
+  const [totals, setTotals] = useState({});
+  useEffect(() => { if (!feed.loading && !feed.error) setTotals((current) => ({ ...current, [tab]: feed.total })); }, [feed.total, feed.loading, tab]);
+  const act = useItemActions(feed.patchItems, refreshBoot);
+  const visible = feed.items.filter(LIBRARY[tab].keep);
+  const href = (item) => itemHref(route, item.id);
+  const [cursor] = useTriage(visible, act, href);
+  useEffect(() => { setReadingContext(visible.map((item) => item.id), "Library"); });
+  const count = (name) => (name === "saved" ? boot.counts.saved : totals[name]);
+
+  let body;
+  if (feed.error) body = html`<${ErrorNote} message=${feed.error} retry=${feed.reload} />`;
+  else if (feed.loading && !feed.items.length) body = html`<${Skeleton} rows=${4} />`;
+  else if (!visible.length) body = html`<${Empty} title=${LIBRARY_EMPTY[tab][0]} action=${tab === "saved" ? html`<a class="btn" href="#/">Go to Today</a>` : null}>${LIBRARY_EMPTY[tab][1]}<//>`;
+  else body = html`<ul class="feed">${visible.map((item, index) => html`<${Row} key=${item.id} item=${item} href=${href(item)} act=${act} cursor=${cursor === index} showSpace=${true} />`)}</ul>`;
+
+  return html`<div class="page">
+    <header class="page-head"><h1>Library</h1><p>What you kept, what you have read, and what you set aside. Saved items stay until you remove them.</p></header>
+    <${Tabs} value=${tab} onChange=${(value) => setQuery(route, { tab: value === "saved" ? undefined : value })}
+      tabs=${[["saved", "Saved"], ["read", "Read"], ["dismissed", "Dismissed"]].map(([value, label]) => ({ value, label, count: count(value) }))} />
+    ${body}
+    <${MoreButton} feed=${feed} />
+  </div>`;
+}
+
+// ---------- Search ----------
+
+const SORTS = [["relevance", "Best match"], ["latest", "Latest"], ["important", "Important"]];
+const SUGGESTIONS = ["agents", "quantum", "fellowship"];
+
+export function Search({ boot, refreshBoot, route }) {
+  const q = (route.query.q || "").trim();
+  const view = SORTS.some(([value]) => value === route.query.view) ? route.query.view : "relevance";
+  const kind = route.query.kind || "";
+  const domain = route.query.domain || "";
+  const [draft, setDraft] = useState(q);
+  useEffect(() => setDraft(q), [q]);
+  const feed = usePagedItems(q ? { q, view, kind, domain, state: "active" } : null);
+  const act = useItemActions(feed.patchItems, refreshBoot);
+  const visible = feed.items.filter((item) => !item.dismissed);
+  const href = (item) => itemHref(route, item.id);
+  const [cursor] = useTriage(visible, act, href);
+  useEffect(() => { setReadingContext(visible.map((item) => item.id), "Search"); });
+  const submit = (event) => { event.preventDefault(); if (draft.trim()) setQuery(route, { q: draft.trim() }); };
+  const facet = (name, value) => setQuery(route, { [name]: route.query[name] === value ? undefined : value });
+
+  let body;
+  if (!q) body = html`<${Empty} title="Search everything PIA has acquired">Try a topic you follow, such as ${SUGGESTIONS.map((word, index) => html`${index ? (index === SUGGESTIONS.length - 1 ? " or " : ", ") : ""}<button class="textlink" onClick=${() => setQuery(route, { q: word })}>${word}</button>`)}.<//>`;
+  else if (feed.error) body = html`<${ErrorNote} message=${feed.error} retry=${feed.reload} />`;
+  else if (feed.loading && !feed.items.length) body = html`<${Skeleton} rows=${5} />`;
+  else if (!visible.length) body = html`<${Empty} title=${`Nothing matches “${q}”`} action=${kind || domain ? { label: "Clear filters", run: () => setQuery(route, { kind: undefined, domain: undefined }) } : null}>Try fewer or different words${kind || domain ? ", or clear the filters" : ""}. Search covers titles, source text and summaries.<//>`;
+  else body = html`<ul class="feed">${visible.map((item, index) => html`<${Row} key=${item.id} item=${item} href=${href(item)} act=${act} cursor=${cursor === index} showSpace=${true} highlight=${q} />`)}</ul>`;
+
+  return html`<div class="page">
+    <header class="page-head"><form class="form-row" role="search" onSubmit=${submit}>
+      <input class="field big" value=${draft} onInput=${(event) => setDraft(event.target.value)} aria-label="Search everything PIA holds" placeholder="Search everything PIA holds" />
+      <button class="btn primary big">Search</button></form>
+      <p class="meta">${q ? (feed.loading && !feed.items.length ? "Searching…" : `${plural(feed.total, "result")} for “${q}”. Titles, summaries, topics and source text.`) : "Search titles, summaries, topics and the text sources supplied."}</p></header>
+    ${q ? html`<div class="search-layout">
+      <aside class="facets" aria-label="Refine results">
+        <div><h3>Sort</h3>${SORTS.map(([value, label]) => html`<button aria-pressed=${view === value} onClick=${() => setQuery(route, { view: value === "relevance" ? undefined : value })}>${label}</button>`)}</div>
+        <div><h3>Kind</h3><button aria-pressed=${!kind} onClick=${() => setQuery(route, { kind: undefined })}>All kinds</button>
+          ${Object.entries(KIND_SHORT).map(([value, label]) => html`<button aria-pressed=${kind === value} onClick=${() => facet("kind", value)}>${label}</button>`)}</div>
+        <div><h3>Space</h3><button aria-pressed=${!domain} onClick=${() => setQuery(route, { domain: undefined })}>All spaces</button>
+          ${boot.domains.map((entry) => html`<button aria-pressed=${domain === entry.slug} onClick=${() => facet("domain", entry.slug)}>${entry.short}</button>`)}</div>
+      </aside>
+      <div>${body}<${MoreButton} feed=${feed} /></div>
+    </div>` : body}
   </div>`;
 }

@@ -637,3 +637,5 @@ button.textlink { display: inline; text-align: left; }
 .feed-note.foot { padding-top: var(--s-8); }
 .ticket-empty { padding: var(--s-2) 0; }
 a.ticket { color: inherit; }
+.field.big { height: 48px; font: var(--w-regular) 20px/1 var(--font-serif); }
+.btn.big { height: 48px; }

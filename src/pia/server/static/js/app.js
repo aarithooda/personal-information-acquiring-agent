@@ -1,8 +1,7 @@
 // The shell: session, routing, navigation and the overlays. Pages live in their own modules.
 import { html, render, useCallback, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
-import { Feed } from "./legacy.js";
-import { Space, SpacesIndex, Topic } from "./feeds.js";
+import { Library, Search, Space, SpacesIndex, Topic } from "./feeds.js";
 import { ReaderSheet } from "./item.js";
 import { Opportunities } from "./opportunities.js";
 import { Interests, Notifications, Sources, System } from "./pages.js";
@@ -357,8 +356,8 @@ function App() {
   if (!section) page = html`<${Today} ...${common} opportunities=${opportunities} />`;
   else if (section === "spaces") page = html`<${SpacesIndex} boot=${boot} route=${route} />`;
   else if (section === "space") page = html`<${Space} ...${common} key=${arg} slug=${arg} />`;
-  else if (section === "library") page = html`<${Feed} ...${common} key="saved" base=${{ state: "saved" }} defaultShow="saved" title="Library" description="Everything you chose to keep." allowViews=${false} />`;
-  else if (section === "search") page = html`<${Feed} ...${common} key=${"q" + route.query.q} base=${{ q: route.query.q || "" }} defaultShow="all" title=${`Search: ${route.query.q || ""}`} description="Across everything PIA has acquired." />`;
+  else if (section === "library") page = html`<${Library} ...${common} />`;
+  else if (section === "search") page = html`<${Search} ...${common} key=${route.query.q || ""} />`;
   else if (section === "topic") page = html`<${Topic} ...${common} key=${arg} id=${Number(arg)} />`;
   else if (section === "opportunities") page = html`<${Opportunities} ...${common} />`;
   else if (section === "sources") page = html`<${Sources} ...${common} />`;
