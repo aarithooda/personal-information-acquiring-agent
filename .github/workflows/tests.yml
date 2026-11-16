@@ -56,4 +56,8 @@ jobs:
 
       - name: Run the test suite
         shell: bash
+        env:
+          # On GitHub Actions the CLI library (Typer) forces coloured terminal output, which puts escape codes
+          # into `--help` text that one test reads. This is Typer's own switch for running under test.
+          _TYPER_FORCE_DISABLE_TERMINAL: "1"
         run: '"$PIA_TEST_PYTHON" -m pytest -q'
