@@ -434,6 +434,74 @@ assert.equal(u.emptyMessage({ total: 0, filtered: true, state: "active" }).clear
 assert.match(u.emptyMessage({ total: 12, filtered: false, state: "unread" }).title, /caught up/);
 assert.match(u.emptyMessage({ total: 0, filtered: false, state: "saved" }).title, /saved/i);
 assert.match(u.emptyMessage({ total: 0, filtered: false, state: "active" }).hint, /Sources/);
+
+// ---- the redesign's presentation rules ----
+assert.equal(u.weightLabel(0), "Hidden");
+assert.equal(u.weightLabel(0.6), "Less");
+assert.equal(u.weightLabel(0.79), "Less");
+assert.equal(u.weightLabel(0.8), "Normal");
+assert.equal(u.weightLabel(1), "Normal");
+assert.equal(u.weightLabel(1.3), "Priority");
+assert.equal(u.weightLabel(1.5), "Priority");
+const spaces = [1.5, 1.4, 1, 0.6, 1.3, 1.6, 1.35, 1.45, 0].map((weight, index) => ({ slug: "s" + index, weight }));
+assert.deepEqual(u.priorityDomains(spaces).map((d) => d.weight), [1.6, 1.5, 1.45, 1.4, 1.35, 1.3]);  // priority only, strongest first, six at most
+assert.deepEqual(u.priorityDomains([{ weight: 1 }, { weight: 0 }]), []);
+
+// Margin notes: at most two clauses, in a fixed order.
+assert.deepEqual(u.reasons({ topics: [{ name: "AI agents", level: 3 }, { name: "Large language models", level: 3 }, { name: "Other", level: 3 }], signals: { stars: 1487 } }),
+  ["Your priority: AI agents and Large language models.", "1,487 stars on GitHub."]);
+assert.deepEqual(u.reasons({ topics: [{ name: "Linear algebra", level: 2 }], signals: { points: 817, comments: 691 } }),
+  ["You follow Linear algebra.", "817 points and 691 comments on Hacker News."]);
+assert.deepEqual(u.reasons({ topics: [], signals: { points: 120 }, resurfaced: true, importance: 0.9 }), ["Newer work builds on this.", "Assessed as significant in its field."]);
+assert.deepEqual(u.reasons({ topics: [], signals: { upvotes: 66 }, importance: 0.9 }), ["66 upvotes on Hugging Face Papers.", "Assessed as significant in its field."]);
+assert.deepEqual(u.reasons({ topics: [], signals: {}, importance: 0.1, domain_short: "Maths" }), ["Ranks near the top of Maths."]);
+assert.equal(u.reasons({ topics: [{ name: "A", level: 3 }], signals: { stars: 5 }, resurfaced: true, importance: 1 }).length, 2);
+
+// The briefing: no clones or dismissed items, thin repositories dropped, one repository, a story leads, six at most.
+const story = (id, kind, extra = {}) => ({ id, kind, title: "t" + id, signals: {}, ...extra });
+const featured = [story(1, "repo", { signals: { stars: 1487 } }), story(2, "repo", { signals: { stars: 12 } }), story(3, "paper"), story(4, "paper", { spam: true }),
+  story(5, "repo", { signals: { stars: 9000 } }), story(6, "news", { dismissed: true }), story(7, "post"), story(8, "news"), story(9, "article"), story(10, "paper"), story(11, "news"), story(12, "news")];
+const briefing = u.composeBriefing(featured);
+assert.deepEqual(briefing.map((x) => x.id), [3, 1, 7, 8, 9, 10]);  // repo 2 (12 stars) and 5 (second repo) dropped, clone and dismissed dropped, paper 3 leads
+assert.equal(u.composeBriefing([story(1, "repo", { signals: { stars: 2000 } }), story(2, "post")]).length, 2);  // nothing else could lead: order is kept
+assert.deepEqual(u.composeBriefing([]), []);
+assert.equal(u.composeBriefing(featured.concat(featured)).length, 6);
+
+// Duplicates: the same posting from two mails folds into one, keeping the first and counting the rest.
+const vault = { item_id: 1, programme: "Venture Vault - Startup Idea Pitch Competition", deadline: "2026-11-18" };
+const vaultAgain = { item_id: 2, title: "Venture Vault: Startup Idea Pitch Competition (reminder)", deadline: "2026-11-18" };
+const india = { item_id: 3, programme: "IndiaAI Fellowship", deadline: "2026-12-01" };
+const indiaAgain = { item_id: 4, programme: "IndiaAI Fellowship 2026", deadline: "2026-12-01" };
+const indiaLater = { item_id: 5, programme: "IndiaAI Fellowship", deadline: "2027-01-10" };
+const folded = u.foldOpportunities([vault, india, vaultAgain, indiaAgain, indiaLater]);
+assert.deepEqual(folded.map((o) => [o.item_id, o.dup]), [[1, 1], [3, 1], [5, 0]]);
+assert.equal(u.oppKey({ programme: "A.B-C d e f g h" }), "abcdefgh|");
+assert.equal(u.oppKey({ title: "Same Title Here", deadline: null }), "sametitleher|");
+assert.deepEqual(u.foldOpportunities([]), []);
+
+// Urgency groups at their boundaries.
+assert.deepEqual([0, 7, 8, 31, 32, null, undefined, 400].map(u.urgencyGroup), ["week", "week", "month", "month", "later", "undated", "undated", "later"]);
+assert.deepEqual([null, undefined, -3, 0, 1, 2, 3, 14, 15].map(u.dueTone), ["none", "none", "", "hot", "hot", "hot", "soon", "soon", ""]);
+assert.deepEqual([null, -1, -4, 0, 1, 2].map(u.dueText), ["No deadline given", "Closed yesterday", "Closed 4 days ago", "Closes today", "Closes tomorrow", "Closes in 2 days"]);
+
+// Days: labels and grouping use the owner's local calendar day.
+const noon = new Date(2026, 10, 16, 12, 0, 0);
+const at = (day, hour) => new Date(2026, 10, day, hour, 0, 0).toISOString();
+assert.equal(u.dayLabel(at(16, 9), noon), "Today");
+assert.equal(u.dayLabel(at(15, 23), noon), "Yesterday");
+assert.equal(u.dayLabel(at(12, 10), noon), "Thursday 12 November");
+const days = u.groupByDay([{ id: 1, sort_at: at(16, 11) }, { id: 2, sort_at: at(16, 8) }, { id: 3, sort_at: at(15, 20) }, { id: 4, sort_at: at(12, 9) }], noon);
+assert.deepEqual(days.map((g) => [g.label, g.items.map((x) => x.id)]), [["Today", [1, 2]], ["Yesterday", [3]], ["Thursday 12 November", [4]]]);
+assert.deepEqual(u.groupByDay([], noon), []);
+
+// The masthead sentence: counts as text, the nearest deadline as a link, others counted.
+const soon = (id, days, name) => ({ item_id: id, days_left: days, programme: name });
+assert.deepEqual(u.standfirst(1964, 6, []), { count: "1,964", noun: "new items", chosen: 6, link: null });
+assert.equal(u.standfirst(1, 6, []).noun, "new item");
+assert.deepEqual(u.standfirst(5, 3, [soon(1, 2, "Venture Vault"), soon(2, 40, "Later")]).link, { id: 1, label: "Venture Vault", tail: "closes in 2 days." });
+assert.equal(u.standfirst(5, 3, [soon(1, 3, "B"), soon(2, 0, "A")]).link.tail, "closes today, and one more deadline falls in the next three days.");
+assert.equal(u.standfirst(5, 3, [soon(1, 1, "A"), soon(2, 2, "B"), soon(3, 3, "C")]).link.tail, "closes tomorrow, and 2 more deadlines fall in the next three days.");
+assert.equal(u.standfirst(5, 3, [soon(1, null, "No date"), soon(2, -1, "Closed")]).link, null);
 console.log("ok");
 """
 
