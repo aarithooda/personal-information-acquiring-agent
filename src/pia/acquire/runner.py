@@ -110,16 +110,18 @@ def _record(conn: sqlite3.Connection, source: sqlite3.Row, now: datetime, result
     if result.ok:
         # An adapter that stopped early (a large mailbox read in day-sized pieces) says how far it really got: the cursor
         # must not pass anything it did not process, and it asks to be called again soon instead of after a full interval.
-        reached, more = now, False
+        reached, more, warning = now, False, None
         if state and state.get("fetched_until"):
-            reached, more = min(now, parse_ts(state["fetched_until"])), bool(state.get("more"))
+            reached, more, warning = min(now, parse_ts(state["fetched_until"])), bool(state.get("more")), state.get("warning")
         conn.execute(
             "INSERT INTO fetch_runs (source_id, started_at, fetched_until, ok, item_count, new_count) VALUES (?, ?, ?, 1, ?, ?)",
             (source["id"], iso(now), iso(reached), result.fetched, result.inserted),
         )
         conn.execute(
-            "UPDATE sources SET last_ok_at = ?, last_error = NULL, failures = 0, next_fetch_at = ? WHERE id = ?",
-            (iso(now), iso(now + (timedelta(minutes=1) if more else interval)), source["id"]),
+            # A warning means progress was made but part of the window is still unread: show it, and count it as a failure so
+            # the source does not look healthy. The failure count resets on the next fully successful run.
+            "UPDATE sources SET last_ok_at = ?, last_error = ?, failures = ?, next_fetch_at = ? WHERE id = ?",
+            (iso(now), warning, 1 if warning else 0, iso(now + (timedelta(minutes=1) if more else interval)), source["id"]),
         )
         if state is not None:
             conn.execute("UPDATE sources SET state = ? WHERE id = ?", (json.dumps(state), source["id"]))

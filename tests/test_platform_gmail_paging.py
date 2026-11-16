@@ -112,6 +112,13 @@ def test_decide_trusted_senders_keywords_and_exclusions():
     assert gmail.decide("club@institute.example", "Revival of the old library", "internship", **rules)[0]  # "viva" is a whole word only
     assert gmail.decide("noreply-emailsupport@iitr.ac.in", "Updates: Your List of Quarantined Emails", "", **rules)[0] is False
     assert gmail.decide("someone@else.example", "Free pizza", "", **rules)[0] is False
+    # keywords count in the subject or the first 600 characters of the body, not deep in a long circular
+    deep = "Dear all. " + "x " * 400 + "There is an internship mentioned here."
+    assert gmail.decide("club@institute.example", "Circular", deep, **rules)[0] is False
+    assert gmail.decide("club@institute.example", "Circular", "An internship is announced for first years. " + deep, **rules) == (True, "keyword: internship")
+    assert gmail.decide("coordinator-bis@iitr.ac.in", "Re: Presentation competition on collaboration", "", **rules) == (True, "keyword: presentation competition")
+    assert gmail.decide("hec@iitr.ac.in", "HEC: Kedarkantha Trek", "Register now", **rules)[0] is False  # HEC is not excluded, just not a keyword hit
+    assert gmail.decide("hec@iitr.ac.in", "HEC hackathon on trekking data", "", **rules)[0] is True
 
 
 # ---------- paging, the cursor, retries and duplicates ----------
@@ -211,6 +218,59 @@ def test_filters_are_enforced_on_what_gmail_returns(token):
     adapter = source(token)
     found = adapter.fetch(httpx.Client(transport=box.transport()), SINCE, SINCE + timedelta(days=1))
     assert sorted(item.title for item in found) == ["Hackathon on Saturday", "Timetable"] and adapter.dropped == 2
+
+
+# ---------- the guarantee, tried at random ----------
+
+
+@pytest.mark.parametrize("seed", range(12))
+def test_whatever_fails_and_however_pages_fall_nothing_is_skipped_and_the_cursor_never_passes_unread_mail(token, seed):
+    """Random mailbox, random page size, random read budget, random transient and permanent failures that later heal.
+    After every run: all messages older than the cursor are stored. After the failures heal: every message is stored, once."""
+    import random
+
+    rng = random.Random(seed)
+    conn = make_db()
+    box = Mailbox(page_size=rng.choice([1, 3, 7, 25, 100]))
+    total = rng.randint(30, 160)
+    for i in range(total):
+        box.add(f"m{i}", NOW - timedelta(days=rng.uniform(0.05, 12)))
+    broken = set(rng.sample(sorted(box.messages), k=rng.randint(0, 4)))
+    box.fail_always |= broken
+    add_source(conn, "University mail", "gmail", domains=("university",), interval=60,
+               config={"senders": [TRUSTED], "token_file": token, "max_messages": rng.choice([5, 20, 60])})
+    client = httpx.Client(transport=box.transport())
+
+    def stored():
+        return {url.split("pia_message=")[1].split("#")[0] for (url,) in conn.execute("SELECT url FROM items")}
+
+    moment, previous = NOW, None
+    for _ in range(60):
+        box.fail_once |= set(rng.sample(sorted(box.messages), k=rng.randint(0, 3)))  # transient trouble on top
+        runner.acquire(conn, client, moment, force=True)
+        cursor = datetime.fromisoformat(conn.execute("SELECT MAX(fetched_until) FROM fetch_runs WHERE ok = 1").fetchone()[0])
+        assert previous is None or cursor >= previous  # the cursor never moves backwards
+        previous = cursor
+        assert cursor <= moment
+        unread_before_cursor = {k for k, m in box.messages.items() if m[0] < cursor - timedelta(seconds=2) and k not in stored()}
+        assert unread_before_cursor == set(), unread_before_cursor  # nothing at all lies behind the cursor unread, broken or not
+        moment += timedelta(minutes=1)
+    if broken:
+        # An unreadable message holds the cursor, and everything newer waits for it. That is deliberate, and it is visible.
+        row = conn.execute("SELECT last_error, failures FROM sources").fetchone()
+        # Either "Stopped before <day>" (progress, then a broken day) or the plain error (the broken day is the first one)
+        assert row["last_error"] and ("Stopped before" in row["last_error"] or "HTTP 500" in row["last_error"]) and row["failures"] >= 1
+
+    box.fail_always.clear()  # the broken ones heal: everything is picked up, nothing lost and nothing duplicated
+    box.fail_once.clear()
+    for _ in range(60):
+        moment += timedelta(hours=2)
+        runner.acquire(conn, client, moment, force=True)
+        if datetime.fromisoformat(conn.execute("SELECT MAX(fetched_until) FROM fetch_runs WHERE ok = 1").fetchone()[0]) >= moment:
+            break
+    assert stored() == set(box.messages)
+    assert conn.execute("SELECT COUNT(*) FROM items").fetchone()[0] == total
+    assert conn.execute("SELECT last_error, failures FROM sources").fetchone()[:] == (None, 0)  # the warning clears once it heals
 
 
 # ---------- through the real runner and database ----------

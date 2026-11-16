@@ -46,8 +46,9 @@ DEFAULT_KEYWORDS = (
     "internship", "fellowship", "scholarship", "hackathon", "datathon", "summer school", "summer research", "call for papers",
     "call for applications", "call for nominations", "applications open", "applications are invited", "application deadline",
     "last date to apply", "research internship", "research opportunity", "internship opportunity", "pitch competition",
-    "coding competition", "programming contest", "student nominations",
+    "coding competition", "programming contest", "student nominations", "presentation competition",
 )
+KEYWORD_BODY_CHARS = 600  # how much of the body a keyword may appear in (the subject always counts)
 # Always dropped, even from a trusted sender: Ph.D. viva-voce notices and the spam-quarantine digest.
 DEFAULT_EXCLUDE_SUBJECTS = ("viva", "quarantined emails")
 DEFAULT_EXCLUDE_SENDERS = ("noreply-emailsupport@iitr.ac.in",)
@@ -184,7 +185,9 @@ def decide(sender: str, subject: str, text: str, *, senders=(), keywords=(), exc
         entry = entry.strip().lower()
         if entry and (address == entry or (entry.startswith("@") and address.endswith(entry))):
             return True, "trusted sender"
-    haystack = f"{subject_lower} {(text or '').lower()}"
+    # A keyword counts in the subject or the opening of the body. A long circular that mentions "internship" in its tenth
+    # paragraph, or a fee-waiver list that says "scholarship", is not an announcement about one.
+    haystack = f"{subject_lower} {(text or '')[:KEYWORD_BODY_CHARS].lower()}"
     for word in keywords:
         if word.lower() in haystack:
             return True, f"keyword: {word}"
@@ -316,12 +319,14 @@ class GmailSource:
             end = min(position + SLICE, until)
             try:
                 day_items, read = self._read_day(client, headers, position, end, seen)
-            except SourceError:
+            except SourceError as exc:
                 if position == since:
                     raise  # nothing finished: report the failure, the cursor does not move
                 # Keep what was finished, stop before the broken day, and wait the normal interval (not "call again at once"):
-                # a message that keeps failing must not be retried every minute.
-                self.state = {"fetched_until": position.isoformat(), "more": False}
+                # a message that keeps failing must not be retried every minute. The runner shows `warning` on the source,
+                # so a stalled cursor is visible instead of the source looking healthy.
+                self.state = {"fetched_until": position.isoformat(), "more": False,
+                              "warning": f"Stopped before {position:%Y-%m-%d}: mail from that day could not be read ({str(exc)[:160]}). Newer mail waits."}
                 return items
             items += day_items
             budget += read
