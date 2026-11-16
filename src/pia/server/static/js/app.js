@@ -8,6 +8,15 @@ import { KIND_LABELS, buildRoute, deadlineText, emptyMessage, parseRoute, plural
 
 const PAGE = 30;
 
+// Theme: System (default), Paper or Night desk. Stored in localStorage as "pia.theme" and applied as data-theme on <html>.
+export function applyTheme(choice) {
+  try {
+    if (choice === "light" || choice === "dark") document.documentElement.dataset.theme = choice;
+    else delete document.documentElement.dataset.theme;
+  } catch { /* no DOM */ }
+}
+try { applyTheme(localStorage.getItem("pia.theme")); } catch { /* storage blocked */ }
+
 function useRoute() {
   const [route, setRoute] = useState(() => parseRoute(location.hash));
   useEffect(() => {

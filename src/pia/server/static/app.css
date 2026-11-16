@@ -1,45 +1,19 @@
 /* PIA. Tokens first, then layout, then components. No inline styles anywhere (the CSP forbids them);
    the only dynamic styling is the custom property --hue, set from script, which selects a space's colour. */
 
-@font-face { font-family: "Schibsted Grotesk"; src: url("/static/fonts/schibsted-grotesk-latin-wght-normal.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
-@font-face { font-family: "Literata"; src: url("/static/fonts/literata-latin-wght-normal.woff2") format("woff2"); font-weight: 200 900; font-display: swap; }
-@font-face { font-family: "Literata"; src: url("/static/fonts/literata-latin-wght-italic.woff2") format("woff2"); font-weight: 200 900; font-style: italic; font-display: swap; }
+@font-face { font-family: "Source Serif 4"; font-style: normal; font-weight: 200 900; font-display: swap;
+  src: url("/static/fonts/source-serif-4-latin-opsz-normal.woff2") format("woff2"); }
+@font-face { font-family: "Source Serif 4"; font-style: italic; font-weight: 200 900; font-display: swap;
+  src: url("/static/fonts/source-serif-4-latin-opsz-italic.woff2") format("woff2"); }
+@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 400 700; font-stretch: 75% 100%; font-display: swap;
+  src: url("/static/fonts/instrument-sans-latin-wdth-normal.woff2") format("woff2"); }
 
+/* Step 1 bridge: the old component rules below still use the old variable names, which now map onto tokens.css. */
 :root {
-  --paper: #edf0f3;
-  --surface: #ffffff;
-  --sunk: #e3e7ec;
-  --ink: #141b27;
-  --ink-2: #47515f;
-  --ink-3: #737d8b;
-  --line: #d5dbe3;
-  --line-soft: #e4e8ed;
-  --focus: #2f5bd8;
-  --amber: #a86300;
-  --red: #c0263a;
-  --green: #1c7548;
-  --hue: 225;
-  --ui: "Schibsted Grotesk", "Segoe UI", system-ui, sans-serif;
-  --read: "Literata", Georgia, "Times New Roman", serif;
-  --side: 252px;
-  --shadow: 0 1px 2px rgb(20 27 39 / 0.06), 0 8px 28px rgb(20 27 39 / 0.1);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0f131a;
-    --surface: #171c26;
-    --sunk: #1e2531;
-    --ink: #e7ebf1;
-    --ink-2: #a8b1be;
-    --ink-3: #78828f;
-    --line: #2a3340;
-    --line-soft: #222a36;
-    --focus: #8aa7ff;
-    --amber: #e8a93c;
-    --red: #f07585;
-    --green: #5fc893;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 30px rgb(0 0 0 / 0.5);
-  }
+  --surface: var(--sheet); --sunk: var(--wash); --line: var(--rule-strong); --line-soft: var(--rule);
+  --focus: var(--annot); --amber: var(--due); --red: var(--alert); --green: var(--ok);
+  --ui: var(--font-sans); --read: var(--font-serif); --shadow: var(--shadow-float);
+  --hue: 225; --side: 252px;
 }
 
 /* A space's colours derive from --hue. They are declared on every element (not once on :root) because a custom
