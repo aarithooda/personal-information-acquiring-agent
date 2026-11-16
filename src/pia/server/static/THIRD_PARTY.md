@@ -6,8 +6,8 @@ own licences.
 | File | What it is | Version | Licence |
 |---|---|---|---|
 | `vendor/preact-htm.js` | htm with Preact and its hooks, as one ES module (`htm/preact/standalone.module.js`) | htm 3.1.1 | htm: Apache-2.0 (`vendor/LICENSE-htm.txt`). Preact, bundled inside it: MIT (below) |
-| `fonts/literata-latin-wght-*.woff2` | Literata, variable weight, Latin subset, upright and italic (from `@fontsource-variable/literata`) | 5.3.0 | SIL Open Font License 1.1 (`fonts/LICENSE-Literata.txt`) |
-| `fonts/schibsted-grotesk-latin-wght-normal.woff2` | Schibsted Grotesk, variable weight, Latin subset (from `@fontsource-variable/schibsted-grotesk`) | 5.3.0 | SIL Open Font License 1.1 (`fonts/LICENSE-Schibsted-Grotesk.txt`) |
+| `fonts/source-serif-4-latin-opsz-*.woff2` | Source Serif 4, variable weight and optical size, Latin subset, upright and italic (from `@fontsource-variable/source-serif-4`) | 5.3.1 | SIL Open Font License 1.1 (`fonts/LICENSE-Source-Serif-4.txt`) |
+| `fonts/instrument-sans-latin-wdth-normal.woff2` | Instrument Sans, variable weight and width, Latin subset (from `@fontsource-variable/instrument-sans`) | 5.3.0 | SIL Open Font License 1.1 (`fonts/LICENSE-Instrument-Sans.txt`) |
 
 ## Preact (MIT)
 

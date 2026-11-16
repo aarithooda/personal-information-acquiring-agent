@@ -1,0 +1,109 @@
+/* PIA design tokens — the single source of truth for colour, type, space, radius, elevation and motion.
+   Production: copy this file to src/pia/server/static/tokens.css and load it before app.css.
+   Layout concept: a quiet left rail, an editorial content column, and a right margin where PIA writes its
+   reasoning ("why this is here") in blue annotation ink. */
+
+:root {
+  /* ---------- colour: light ("paper") ---------- */
+  --paper: #f3f4f1;          /* page ground: cool, faintly green-grey, never cream */
+  --sheet: #fbfbfa;          /* raised reading surfaces: reader sheet, drawer, palette */
+  --ink: #16191d;            /* primary text, headlines */
+  --ink-2: #4a5059;          /* secondary text, summaries */
+  --ink-3: #626974;          /* metadata, captions (5.0:1 on --paper, 4.6:1 on --wash) */
+  --rule: #dcdfda;           /* hairlines between rows and sections */
+  --rule-strong: #c2c7c0;    /* control borders, section heads */
+  --wash: #e8eae5;           /* hover and selected fills */
+  --annot: #2d44b8;          /* PIA's annotation ink: reasons, links, focus, primary action */
+  --annot-ink: #ffffff;      /* text on --annot fills */
+  --annot-wash: #e3e7f7;     /* annotation backgrounds, selected chips */
+  --due: #9a5506;            /* deadlines 3-14 days out */
+  --due-wash: #f5ead6;
+  --alert: #b3261e;          /* deadlines 0-2 days, failures, destructive */
+  --alert-wash: #f7e2df;
+  --ok: #2c6a3c;             /* eligible, working, accepted */
+  --ok-wash: #e0ede3;
+  --scrim: rgba(22, 25, 29, 0.32);
+  --shadow-float: 0 18px 40px -12px rgba(22, 25, 29, 0.22), 0 2px 6px rgba(22, 25, 29, 0.08);
+
+  /* ---------- type ---------- */
+  --font-serif: "Source Serif 4", "Source Serif Pro", Georgia, "Times New Roman", serif;   /* headlines, reading, annotations */
+  --font-sans: "Instrument Sans", "Segoe UI", system-ui, -apple-system, sans-serif;         /* interface, metadata */
+
+  /* size / line-height pairs (minor third from 16, rounded to whole pixels) */
+  --t-display: 52px;   --lh-display: 1.04;   /* Today masthead date */
+  --t-title: 40px;     --lh-title: 1.1;      /* reader headline */
+  --t-h1: 32px;        --lh-h1: 1.15;        /* page titles, briefing lead */
+  --t-h2: 24px;        --lh-h2: 1.22;        /* briefing entries, section leads */
+  --t-h3: 20px;        --lh-h3: 1.3;         /* feed headlines (important) */
+  --t-h4: 17px;        --lh-h4: 1.35;        /* compact headlines (latest, rails) */
+  --t-read: 19px;      --lh-read: 1.62;      /* reader prose (serif) */
+  --t-body: 15px;      --lh-body: 1.55;      /* UI body, summaries (sans) */
+  --t-annot: 15px;     --lh-annot: 1.45;     /* margin annotations (serif italic) */
+  --t-ui: 14px;        --lh-ui: 1.4;         /* controls */
+  --t-meta: 13px;      --lh-meta: 1.4;       /* metadata */
+  --t-micro: 12px;     --lh-micro: 1.3;      /* kind labels, counters */
+
+  --w-regular: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
+  --w-bold: 700;
+
+  /* ---------- space (4px base) ---------- */
+  --s-1: 2px;  --s-2: 4px;  --s-3: 8px;  --s-4: 12px;  --s-5: 16px;  --s-6: 20px;
+  --s-7: 24px; --s-8: 32px; --s-9: 40px; --s-10: 48px; --s-11: 64px; --s-12: 80px;
+
+  /* ---------- layout ---------- */
+  --rail: 232px;             /* left navigation rail (desktop) */
+  --content-max: 1120px;     /* content column incl. margin column */
+  --measure: 680px;          /* reading measure (~66ch at --t-read) */
+  --margin-col: 248px;       /* annotation margin */
+  --gutter: 32px;            /* gap between main and margin columns */
+  --topbar: 56px;
+  --reader-max: 1040px;      /* reader sheet width on desktop */
+
+  /* ---------- shape ---------- */
+  --r-0: 0;                  /* rows, sections, reading sheet edge */
+  --r-1: 3px;                /* buttons, inputs, chips, tags */
+  --r-2: 8px;                /* floating layers: palette, drawer, popover, toast */
+  --hair: 1px;
+
+  /* ---------- motion ---------- */
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-1: 120ms;            /* hover, press */
+  --dur-2: 200ms;            /* menus, toasts */
+  --dur-3: 280ms;            /* reader sheet, drawer */
+
+  /* ---------- z ---------- */
+  --z-rail: 20; --z-topbar: 30; --z-sheet: 50; --z-drawer: 60; --z-palette: 70; --z-toast: 80;
+
+  color-scheme: light;
+}
+
+/* ---------- colour: dark ("night desk") — same roles, re-tuned, not inverted ---------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #111419; --sheet: #171b21; --ink: #e8eaed; --ink-2: #b1b7c0; --ink-3: #868d98;
+    --rule: #252a32; --rule-strong: #353c46; --wash: #1d2229;
+    --annot: #9aabff; --annot-ink: #0f1430; --annot-wash: #1d2343;
+    --due: #e6a94f; --due-wash: #2c2315; --alert: #f2877d; --alert-wash: #301b1a; --ok: #83c794; --ok-wash: #17271c;
+    --scrim: rgba(0, 0, 0, 0.5);
+    --shadow-float: 0 18px 40px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #111419; --sheet: #171b21; --ink: #e8eaed; --ink-2: #b1b7c0; --ink-3: #868d98;
+  --rule: #252a32; --rule-strong: #353c46; --wash: #1d2229;
+  --annot: #9aabff; --annot-ink: #0f1430; --annot-wash: #1d2343;
+  --due: #e6a94f; --due-wash: #2c2315; --alert: #f2877d; --alert-wash: #301b1a; --ok: #83c794; --ok-wash: #17271c;
+  --scrim: rgba(0, 0, 0, 0.5);
+  --shadow-float: 0 18px 40px -12px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
+
+/* Breakpoints (use in media queries; CSS custom properties cannot be used there):
+   xs  < 600px   phone: single column, bottom tab bar, reader full-screen
+   sm  600-899   large phone / small tablet: single column, bottom tab bar
+   md  900-1199  tablet / small laptop: rail collapses to 64px icons, margin notes move under headlines
+   lg  1200-1439 laptop: full rail, margin column
+   xl  >= 1440   desktop: full rail, margin column, wider gutters */
