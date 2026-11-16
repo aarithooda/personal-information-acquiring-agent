@@ -1,7 +1,8 @@
 // The shell: session, routing, navigation and the overlays. Pages live in their own modules.
 import { html, render, useCallback, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
-import { Feed, TopicPage } from "./legacy.js";
+import { Feed } from "./legacy.js";
+import { Space, SpacesIndex, Topic } from "./feeds.js";
 import { ReaderSheet } from "./item.js";
 import { Interests, Notifications, Opportunities, Sources, System } from "./pages.js";
 import { Empty, ErrorNote, Icon, IconButton, MarginNote, Meta, NotificationsDrawer, Palette, Row, RowActions, Shortcuts, Skeleton, Toasts, applyTheme, go, hueStyle, itemHref, loadSpaceTops, setReadingContext, toast, useItemActions, useItemSync, useLoad, useTriage } from "./ui.js";
@@ -300,11 +301,6 @@ function Today({ boot, refreshBoot, route, opportunities }) {
 
 // ---------- the app ----------
 
-function SpacesStub({ boot }) {  // replaced by the Spaces index in step 6
-  return html`<div class="page"><header class="page-head"><h1>Spaces</h1></header>
-    <ul class="feed">${boot.domains.map((domain) => html`<li class="row"><a href=${buildRoute(["space", domain.slug])}>${domain.name}</a></li>`)}</ul></div>`;
-}
-
 function App() {
   const route = useRoute();
   const [session, setSession] = useState(null);
@@ -358,15 +354,11 @@ function App() {
   const common = { boot, refreshBoot, route };
   let page;
   if (!section) page = html`<${Today} ...${common} opportunities=${opportunities} />`;
-  else if (section === "spaces") page = html`<${SpacesStub} boot=${boot} />`;
-  else if (section === "space") {
-    const domain = boot.domains.find((entry) => entry.slug === arg);
-    page = domain
-      ? html`<${Feed} ...${common} key=${arg} base=${{ domain: arg }} title=${domain.name} description=${domain.description} hue=${domain.hue} />`
-      : html`<div class="page"><${Empty} title="No such space">The link may be out of date. <a class="textlink" href="#/spaces">See all spaces</a>.<//></div>`;
-  } else if (section === "library") page = html`<${Feed} ...${common} key="saved" base=${{ state: "saved" }} defaultShow="saved" title="Library" description="Everything you chose to keep." allowViews=${false} />`;
+  else if (section === "spaces") page = html`<${SpacesIndex} boot=${boot} route=${route} />`;
+  else if (section === "space") page = html`<${Space} ...${common} key=${arg} slug=${arg} />`;
+  else if (section === "library") page = html`<${Feed} ...${common} key="saved" base=${{ state: "saved" }} defaultShow="saved" title="Library" description="Everything you chose to keep." allowViews=${false} />`;
   else if (section === "search") page = html`<${Feed} ...${common} key=${"q" + route.query.q} base=${{ q: route.query.q || "" }} defaultShow="all" title=${`Search: ${route.query.q || ""}`} description="Across everything PIA has acquired." />`;
-  else if (section === "topic") page = html`<${TopicPage} ...${common} key=${arg} id=${Number(arg)} />`;
+  else if (section === "topic") page = html`<${Topic} ...${common} key=${arg} id=${Number(arg)} />`;
   else if (section === "opportunities") page = html`<${Opportunities} ...${common} />`;
   else if (section === "sources") page = html`<${Sources} ...${common} />`;
   else if (section === "interests") page = html`<${Interests} ...${common} />`;

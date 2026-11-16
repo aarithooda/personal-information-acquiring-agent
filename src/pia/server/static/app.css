@@ -631,3 +631,5 @@ button.textlink { display: inline; text-align: left; }
 .line.compact { grid-template-columns: minmax(0, 1fr) auto; }
 .spaces-index.one { grid-template-columns: minmax(0, 1fr); }
 .pad-top { padding-top: var(--s-5); }
+.section.tight { padding-top: var(--s-7); }
+.field.compact { height: 30px; font-size: var(--t-meta); }

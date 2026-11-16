@@ -182,7 +182,7 @@ export function Toggle({ checked, onChange, label }) {
 }
 
 // A button that opens a small popover of choices. Esc and an outside click close it; arrow keys move between choices.
-export function Menu({ label, items, value, onSelect, after = [], className = "", align = "right" }) {
+export function Menu({ label, items, value, onSelect, after = [], className = "", align = "right", active = false }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef(null);
   const button = useRef(null);
@@ -204,7 +204,7 @@ export function Menu({ label, items, value, onSelect, after = [], className = ""
   };
   const choose = (entry) => { setOpen(false); button.current?.focus(); onSelect(entry.value); };
   return html`<div class=${"menu-wrap " + className} ref=${wrap} onKeyDown=${key}>
-    <button class=${"btn small" + (value ? " on" : "")} ref=${button} aria-haspopup="menu" aria-expanded=${open} onClick=${() => setOpen(!open)}>${label}<${Icon} name="down" size=${14} /></button>
+    <button class=${"btn small" + (active ? " on" : "")} ref=${button} aria-haspopup="menu" aria-expanded=${open} onClick=${() => setOpen(!open)}>${label}<${Icon} name="down" size=${14} /></button>
     ${open && html`<div class=${"menu" + (align === "left" ? " left" : "")} role="menu">
       ${items.map((entry) => html`<button role="menuitemradio" aria-checked=${value === entry.value} title=${entry.hint || undefined} onClick=${() => choose(entry)}>
         ${entry.label}${value === entry.value && html`<${Icon} name="check" size=${15} />`}</button>`)}

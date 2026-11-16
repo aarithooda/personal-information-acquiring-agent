@@ -1,4 +1,4 @@
-// TEMPORARY (removed before step 6 ends): the old Home, Feed and Topic pages and their row components, kept so every
+// TEMPORARY (removed in step 8): the old Feed page (Library and Search) and their row components, kept so every
 // route keeps working while the redesigned screens replace them one step at a time.
 import { html, useCallback, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api } from "./api.js";
@@ -59,82 +59,6 @@ export function ItemRow({ item, openHref, act, cursor = false, showSpace = true 
 }
 
 // ---------- Home ----------
-
-function Spectrum({ domains }) {
-  const total = domains.reduce((sum, domain) => sum + domain.unread, 0);
-  return html`<nav aria-label="Unread by space">
-    <div class="spectrum">
-      ${domains.map((domain) => html`<a href=${buildRoute(["space", domain.slug])} class=${domain.unread ? "" : "quiet"} style=${{ ...hueStyle(domain.hue), flexGrow: 0.7 + Math.sqrt(domain.unread) }}
-        title=${`${domain.name}: ${plural(domain.unread, "unread item")}`}>
-        <b>${domain.unread || ""}</b><span>${domain.short}</span></a>`)}
-    </div>
-    <div class="spectrum-key"><span>Each band is one of your spaces, sized by what is unread</span><span>${plural(total, "unread item")}</span></div>
-  </nav>`;
-}
-
-export function Home({ boot, refreshBoot, route }) {
-  const { loading, data, error, reload, patch } = useLoad(() => api.home(), [boot.agent.last_run && boot.agent.last_run.finished_at]);
-  const patchItems = useCallback((id, change) => patch((current) => current && { ...current, featured: current.featured.map((item) => (item.id === id ? { ...item, ...change } : item)) }), [patch]);
-  const act = useItemActions(patchItems, refreshBoot);
-  const newToday = boot.domains.reduce((sum, domain) => sum + domain.new_today, 0);
-  const active = boot.domains.filter((domain) => domain.new_today > 0).length;
-  const href = (item) => buildRoute(route.path, { ...route.query, item: item.id });
-  const featured = data ? data.featured.filter((item) => !item.dismissed) : [];
-  const [lead, ...rest] = featured;
-  const onboarding = boot.onboarding;
-
-  return html`<div class="page">
-    <header class="page-head">
-      <p class="home-lede">${newToday
-        ? html`<b>${plural(newToday, "new item")}</b> in the last day across ${plural(active, "space")}. Here is what deserves your attention first.`
-        : html`Nothing new in the last day. ${boot.counts.items ? "Here is what is still worth your attention." : "PIA is gathering its first items."}`}</p>
-      <${Spectrum} domains=${boot.domains} />
-    </header>
-    <div class="home-grid">
-      <section aria-label="Featured">
-        <div class="section-title"><h2>Featured for you</h2>
-          ${featured.length > 0 && html`<button onClick=${() => api.markRead(featured.map((item) => item.id)).then(() => { reload(); refreshBoot(); })}>Mark these read</button>`}</div>
-        ${loading && !data && html`<${Loading} lines=${6} />`}
-        ${error && html`<${ErrorNote} message=${error} retry=${reload} />`}
-        ${data && featured.length === 0 && html`<${Empty} title="You are caught up" hint="Nothing unread is waiting on Home. Every space still has its full feed." />`}
-        ${lead && html`<article class="lead" style=${hueStyle(lead.hue)}>
-          <div class="row-meta"><span class="kind">${KIND_LABELS[lead.kind]}</span><span>${lead.source}</span><span>${lead.domain_short}</span><time>${timeAgo(lead.sort_at)}</time></div>
-          <h3 class="row-title"><a href=${href(lead)}>${lead.title}</a></h3>
-          ${lead.summary && html`<p class="row-summary">${lead.summary}</p>`}
-          <div class="lead-foot">
-            <${Marks} value=${lead.importance} />
-            ${(lead.topics || []).map((topic) => html`<a class=${"chip" + (topic.level >= 2 ? " liked" : "")} href=${buildRoute(["topic", String(topic.id)])}>${topic.name}</a>`)}
-            <span class="grow"></span>
-            <button class=${"button small" + (lead.saved ? " on" : "")} onClick=${() => act(lead, { saved: !lead.saved })}><${Icon} name="bookmark" size=${15} fill=${lead.saved} /> ${lead.saved ? "Saved" : "Save"}</button>
-            <a class="button small primary" href=${href(lead)}>Read the brief</a>
-          </div>
-        </article>`}
-        ${rest.length > 0 && html`<ul class="feed">${rest.map((item) => html`<${ItemRow} key=${item.id} item=${item} openHref=${href(item)} act=${act} />`)}</ul>`}
-      </section>
-      <aside class="rail">
-        ${!onboarding.dismissed && onboarding.rated < 25 && html`<div class="prompt-card">
-          <h3>Tell PIA what you care about</h3>
-          <p>Rate a few topics per space so ranking reflects you. It takes a couple of minutes and you can stop at any point.</p>
-          <div class="meter"><i style=${{ width: `${Math.min(100, (onboarding.rated / 25) * 100)}%` }}></i></div>
-          <a class="button small primary" href=${buildRoute(["interests"])}>Rate topics</a>
-          <button class="button small quiet" onClick=${() => api.dismissOnboarding().then(refreshBoot)}>Not now</button>
-        </div>`}
-        <section>
-          <div class="section-title"><h2>Closing soon</h2><a href=${buildRoute(["opportunities"])}>All opportunities</a></div>
-          ${data && data.deadlines.length === 0 && html`<p class="feed-note">No dated opportunities yet. Add the organisations you want watched under Opportunities.</p>`}
-          <ul class="rail-list">${(data ? data.deadlines : []).map((o) => html`<li><a href=${buildRoute(route.path, { ...route.query, item: o.item_id })}>
-            <span class="t">${o.programme || o.title}</span>
-            <span class=${"due" + (o.days_left <= 7 ? " soon" : "")}>${deadlineText(o.days_left)}</span> <span class="s">${o.organisation || o.source_name}</span></a></li>`)}</ul>
-        </section>
-        <section>
-          <div class="section-title"><h2>Your spaces</h2></div>
-          <ul class="rail-list">${[...boot.domains].sort((a, b) => b.new_today - a.new_today).slice(0, 6).map((domain) => html`<li><a href=${buildRoute(["space", domain.slug])}>
-            <span class="t">${domain.short}</span><span class="s">${plural(domain.new_today, "new item")} today, ${domain.unread} unread</span></a></li>`)}</ul>
-        </section>
-      </aside>
-    </div>
-  </div>`;
-}
 
 // ---------- feeds: a space, Saved, search results, a topic ----------
 
@@ -221,21 +145,3 @@ export function Feed({ boot, refreshBoot, route, base, title, description, hue, 
     ${meta.hasMore && html`<div class="more"><button class="button" disabled=${meta.loading} onClick=${() => load(items.length)}>${meta.loading ? "Loading…" : "Show more"}</button></div>`}
   </div>`;
 }
-
-export function TopicPage({ boot, refreshBoot, route, id }) {
-  const { data, error, reload } = useLoad(() => api.topic(id), [id]);
-  if (error) return html`<div class="page"><${ErrorNote} message=${error} retry=${reload} /></div>`;
-  if (!data) return html`<div class="page"><${Loading} /></div>`;
-  const topic = data.topic;
-  const rate = (level) => api.rateTopic(topic.id, level).then(() => { reload(); refreshBoot(); toast(level === null ? "Rating cleared" : "Interest updated"); });
-  return html`<div>
-    <div class="page"><div class="toolbar">
-      <span>Your interest in this ${topic.kind === "topic" ? "topic" : "name"}:</span>
-      <div class="rate">${[[3, "Priority"], [2, "High"], [1, "Some"], [-1, "None"], [-2, "Mute"]].map(([level, label]) => html`<button class=${level < 0 ? "neg" : ""}
-        aria-pressed=${topic.level === level} onClick=${() => rate(topic.level === level ? null : level)}>${label}</button>`)}</div>
-    </div></div>
-    <${Feed} boot=${boot} refreshBoot=${refreshBoot} route=${route} base=${{ topic: topic.id }} title=${topic.name}
-      description=${`A timeline of everything PIA has acquired about this, newest first. ${plural(topic.item_count, "item")}${topic.domain ? ` in ${topic.domain}` : ""}.`} />
-  </div>`;
-}
-
