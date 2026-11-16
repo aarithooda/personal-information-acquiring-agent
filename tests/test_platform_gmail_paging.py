@@ -33,6 +33,8 @@ class Mailbox:
         self.get_calls = []
         self.fail_once = set()  # ids whose first read answers 503
         self.fail_always = set()  # ids whose reads always answer 500
+        self.rate_limited_once = set()  # ids whose first read answers 403 (Gmail's transient rate limit)
+        self.forbidden_always = set()  # ids whose reads always answer 403
 
     def add(self, message_id, when, sender=TRUSTED, subject="Summer internship: applications open", body="Apply soon."):
         self.messages[message_id] = (when, sender, subject, body)
@@ -58,6 +60,11 @@ class Mailbox:
             return httpx.Response(200, json=body)
         message_id = path.rsplit("/", 1)[1]
         self.get_calls.append(message_id)
+        if message_id in self.forbidden_always:
+            return httpx.Response(403)
+        if message_id in self.rate_limited_once:
+            self.rate_limited_once.discard(message_id)
+            return httpx.Response(403)
         if message_id in self.fail_always:
             return httpx.Response(500)
         if message_id in self.fail_once:
@@ -75,6 +82,7 @@ def no_waiting(monkeypatch):
     from pia.http import request_with_retry
 
     monkeypatch.setitem(request_with_retry.__kwdefaults__, "sleep", lambda seconds: None)  # retries must not slow the tests
+    monkeypatch.setattr(gmail, "_sleep", lambda seconds: None)
 
 
 @pytest.fixture
@@ -173,6 +181,20 @@ def test_a_transient_failure_is_retried_and_does_not_lose_the_message(token):
     box.fail_once.add("flaky")
     found = source(token).fetch(httpx.Client(transport=box.transport()), SINCE, SINCE + timedelta(days=1))
     assert len(found) == 2 and box.get_calls.count("flaky") == 2
+
+
+def test_a_transient_403_rate_limit_is_waited_out_but_a_persistent_403_still_fails(token):
+    box = Mailbox()
+    box.add("limited", SINCE + timedelta(hours=2))
+    box.add("fine", SINCE + timedelta(hours=3))
+    box.rate_limited_once.add("limited")
+    found = source(token).fetch(httpx.Client(transport=box.transport()), SINCE, SINCE + timedelta(days=1))
+    assert len(found) == 2 and box.get_calls.count("limited") == 2
+
+    box.forbidden_always.add("limited")  # a real refusal (say, a revoked permission) is not retried forever
+    with pytest.raises(SourceError):
+        source(token).fetch(httpx.Client(transport=box.transport()), SINCE, SINCE + timedelta(days=1))
+    assert box.get_calls.count("limited") == 2 + 1 + len(gmail.RATE_LIMIT_WAITS)
 
 
 def test_a_failure_part_way_keeps_finished_days_and_leaves_the_cursor_before_the_broken_day(token):

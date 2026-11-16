@@ -17,8 +17,10 @@ Design (docs/platform/GMAIL.md has the setup steps and the reasoning):
 import base64
 import hashlib
 import json
+import logging
 import re
 import secrets
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from email.utils import parseaddr, parsedate_to_datetime
@@ -38,6 +40,7 @@ AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
 TOKEN_FILE = PROJECT_ROOT / "data" / "secrets" / "gmail.json"
+log = logging.getLogger(__name__)
 MAX_BODY_CHARS = 6000
 # Two ways a message gets in. (1) A TRUSTED SENDER: an exact address the owner has verified; everything from it is
 # inspected. (2) A SPECIFIC KEYWORD from anyone else. Single generic words ("notice", "registration", "opportunity", "talk",
@@ -55,6 +58,24 @@ DEFAULT_EXCLUDE_SENDERS = ("noreply-emailsupport@iitr.ac.in",)
 SLICE = timedelta(days=1)  # mail is read one day at a time, oldest first, so the cursor can only move over finished days
 LIST_PAGE_SIZE = 100
 MAX_LIST_PAGES = 50  # per day: 5,000 matching messages in one day would mean the filters are wrong, and fails loudly
+
+
+RATE_LIMIT_WAITS = (2, 5, 12)  # seconds; Gmail reports transient per-user rate limiting as HTTP 403 as well as 429
+_sleep = time.sleep
+
+
+def _get(client: httpx.Client, url: str, **kwargs) -> httpx.Response:
+    """A GET that also waits out Gmail's transient 403 rate limits, which the shared retry layer (429 and 5xx only) does not.
+    A 403 that persists (for example a revoked permission) still fails after the last wait. Only ever GET: mail is only read."""
+    for wait in (*RATE_LIMIT_WAITS, None):
+        try:
+            return request_with_retry(client, "GET", url, **kwargs)
+        except SourceError as exc:
+            if exc.status != 403 or wait is None:
+                raise
+            log.warning("%s: HTTP 403 (usually Gmail rate limiting), retrying in %ds", url, wait)
+            _sleep(wait)
+    raise AssertionError("unreachable")
 
 
 class GmailNotConnected(SourceError):
@@ -268,7 +289,7 @@ class GmailSource:
             params = {"q": self._query(start, end), "maxResults": LIST_PAGE_SIZE}
             if token:
                 params["pageToken"] = token
-            listing = request_with_retry(client, "GET", f"{API}/messages", headers=headers, params=params).json()
+            listing = _get(client, f"{API}/messages", headers=headers, params=params).json()
             ids += [reference["id"] for reference in listing.get("messages", [])]
             token = listing.get("nextPageToken")
             if not token:
@@ -283,7 +304,7 @@ class GmailSource:
             if message_id in seen:
                 continue  # also returned for the previous slice's boundary
             try:
-                message = request_with_retry(client, "GET", f"{API}/messages/{message_id}", headers=headers, params={"format": "full"}).json()
+                message = _get(client, f"{API}/messages/{message_id}", headers=headers, params={"format": "full"}).json()
             except SourceError as exc:
                 if exc.status == 404:
                     continue  # deleted between listing and reading: nothing to acquire
