@@ -128,7 +128,7 @@ function SourceRow({ source, onPause, onRemove }) {
 }
 
 function SourceTable({ list, onPause, onRemove }) {
-  return html`<div class="table-wrap"><table class="grid sources"><thead><tr><th>Source</th><th>Reads</th><th>Status</th><th class="n">This week</th><th class="n">All</th><th></th></tr></thead>
+  return html`<div class="table-wrap" tabindex="0"><table class="grid sources"><thead><tr><th>Source</th><th>Reads</th><th>Status</th><th class="n">This week</th><th class="n">All</th><th><span class="sr">Actions</span></th></tr></thead>
     <tbody>${list.map((source) => html`<${SourceRow} key=${source.id} source=${source} onPause=${onPause} onRemove=${onRemove} />`)}</tbody></table></div>`;
 }
 
@@ -190,7 +190,7 @@ function Organisations({ organisations, reload }) {
         <input class="field" placeholder="Careers or programme page (optional)" aria-label="Page address" value=${url} onInput=${(event) => setUrl(event.target.value)} />
         <button class="btn primary" disabled=${busy || !name.trim()}>${busy ? "Checking the page…" : "Add organisation"}</button></form></section>
     ${organisations.length === 0 ? html`<${Empty} title="No organisations yet">Until you add some, Opportunities only shows what comes from sources you follow, such as contest listings.<//>`
-      : html`<div class="table-wrap"><table class="grid"><thead><tr><th>Organisation</th><th>Pages watched</th><th class="n">Open now</th><th></th></tr></thead><tbody>
+      : html`<div class="table-wrap" tabindex="0"><table class="grid"><thead><tr><th>Organisation</th><th>Pages watched</th><th class="n">Open now</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
         ${organisations.map((organisation) => html`<tr key=${organisation.id}><td><b class="name">${organisation.name}</b>${organisation.homepage && html`<span class="sub">${organisation.homepage}</span>`}</td>
             <td>${organisation.sources.length === 0 ? html`<span class="sub">No pages yet</span>` : organisation.sources.map((source) => html`<span class=${"health block " + source.health} title=${source.last_error || ""}><i></i>${source.url.replace(/^https?:\/\//, "").slice(0, 48)}</span>`)}</td>
             <td class="n">${organisation.open_count}</td>
@@ -293,6 +293,7 @@ export function Sources({ boot, refreshBoot, route }) {
     ${tab === "suggested" && html`<div>
       <div class="toolbar"><p class="feed-note flush">Each suggestion is measured before it is shown: how often it publishes, how well it matches your interests, and how much of it you already receive.</p>
         <span class="grow"></span><button class="btn small" disabled=${looking} onClick=${discover}><${Icon} name="refresh" size=${14} /> ${looking ? "Looking…" : "Look for new sources"}</button></div>
+      <h2 class="sr">Suggested sources</h2>
       ${candidates.length === 0 ? html`<${Empty} title="No suggestions waiting">PIA looks for new sources once a day, from sites that well-ranked items keep pointing to and from your interests.<//>`
         : candidates.map((source) => html`<${Suggestion} key=${source.id} source=${source} onDecide=${decide} />`)}
     </div>`}
@@ -330,7 +331,7 @@ function NotificationsTab() {
     <section class="panel"><h2>How important it has to be</h2>
       <p class="hint">Each level needs an item's combined score to reach its threshold. Lower a threshold to hear more; the daily limit stops a busy day from flooding you.</p>
       ${LEVELS.map(([level, label]) => html`<${Range} key=${level} label=${label} value=${s.thresholds[level]} min=${0.3} max=${0.95} step=${0.01} format=${(v) => Math.round(v * 100)} onCommit=${(value) => save({ thresholds: { [level]: value } })} />`)}
-      <div class="table-wrap"><table class="grid narrow"><thead><tr><th>Level</th><th class="n">At most per day</th></tr></thead><tbody>
+      <div class="table-wrap" tabindex="0"><table class="grid narrow"><thead><tr><th>Level</th><th class="n">At most per day</th></tr></thead><tbody>
         ${LEVELS.map(([level, label]) => html`<tr key=${level}><td>${label}</td><td class="n"><input class="field cap" type="number" min="0" max="40" aria-label=${`Daily limit for ${label}`} value=${s.daily_caps[level]}
           onChange=${(event) => save({ daily_caps: { [level]: Math.max(0, Math.min(40, Number(event.target.value) || 0)) } })} /></td></tr>`)}</tbody></table></div></section>
     <section class="panel"><h2>On your desktop</h2>
@@ -357,7 +358,7 @@ function DevicesTab() {
   const copy = () => navigator.clipboard.writeText(token).then(() => toast("Token copied"), () => toast("Copy it by hand: select the text and press Ctrl C.", { error: true }));
   return html`<section class="panel"><h2>Desktop companion</h2>
     <p class="hint">The Windows companion shows PIA's notifications as ordinary desktop notifications and opens the item when you click one. It needs a token from here. Setup steps are in companion/README.md.</p>
-    ${data.devices.length > 0 ? html`<div class="table-wrap"><table class="grid"><thead><tr><th>Device</th><th>Added</th><th>Last seen</th><th></th></tr></thead><tbody>
+    ${data.devices.length > 0 ? html`<div class="table-wrap" tabindex="0"><table class="grid"><thead><tr><th>Device</th><th>Added</th><th>Last seen</th><th><span class="sr">Actions</span></th></tr></thead><tbody>
       ${data.devices.map((device) => html`<tr key=${device.id}><td>${device.name}</td><td>${dateTime(device.created_at)}</td><td>${device.last_seen_at ? timeAgo(device.last_seen_at) : "Never"}</td>
         <td><button class="btn small quiet danger" onClick=${() => setRevoking(device.id)}>Revoke</button></td></tr>
         ${revoking === device.id && html`<tr><td colspan="4"><${InlineConfirm} message=${`Revoke ${device.name}? Its token stops working.`} confirmLabel="Revoke" onConfirm=${() => { setRevoking(null); api.removeDevice(device.id).then(reload, fail); }} onCancel=${() => setRevoking(null)} /></td></tr>`}`)}</tbody></table></div>`
@@ -408,7 +409,7 @@ function SystemTab({ refreshBoot }) {
     <section class="panel"><h2>Agent</h2>
       <p class="summary-line">${data.running ? "Working now." : data.background ? "Running in the background." : "Not running in the background."} <b>${group(totalItems)}</b> items held, <b>${group(data.items.assessed || 0)}</b> assessed by a model, <b>${group(data.items.classified || 0)}</b> waiting. Database ${bytes(data.db_bytes)}.</p>
       <div class="form-row"><button class="btn" onClick=${() => run(false)}><${Icon} name="refresh" size=${15} /> Run a cycle now</button><button class="btn quiet" onClick=${() => run(true)}>Fetch every source now</button></div>
-      <div class="table-wrap"><table class="grid"><thead><tr><th>Started</th><th>Took</th><th>Result</th></tr></thead><tbody>
+      <div class="table-wrap" tabindex="0"><table class="grid"><thead><tr><th>Started</th><th>Took</th><th>Result</th></tr></thead><tbody>
         ${data.runs.map((entry) => {
           const stats = JSON.parse(entry.stats || "{}");
           const seconds = entry.finished_at ? Math.round((new Date(entry.finished_at) - new Date(entry.started_at)) / 1000) : null;
@@ -420,7 +421,7 @@ function SystemTab({ refreshBoot }) {
     <section class="panel"><h2>Models and cost</h2>
       <p class="hint">Estimated from token counts and the prices in config/models.toml. Deterministic steps (classification, ranking, linking related items) cost nothing. The agent stops calling models for the day at ${usd(data.budget.daily_usd)}.</p>
       <p class="summary-line">Today <b>${usd(usage.today_usd)}</b>. Last ${usage.days} days <b>${usd(usage.total_usd)}</b>. Model provider: <b>${data.jev ? "Groq, plus Jev for personal fit" : "Groq only"}</b>.</p>
-      ${usage.by_task.length === 0 ? html`<p class="hint">No model has been called yet.</p>` : html`<div class="table-wrap"><table class="grid"><thead><tr><th>Job</th><th>Model</th><th class="n">Calls</th><th class="n">Items</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Failed</th><th class="n">Cost</th></tr></thead><tbody>
+      ${usage.by_task.length === 0 ? html`<p class="hint">No model has been called yet.</p>` : html`<div class="table-wrap" tabindex="0"><table class="grid"><thead><tr><th>Job</th><th>Model</th><th class="n">Calls</th><th class="n">Items</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Failed</th><th class="n">Cost</th></tr></thead><tbody>
         ${usage.by_task.map((row) => html`<tr><td>${row.task === "fit" && !data.jev ? "Personal fit (Jev): past calls, now switched off" : TASKS[row.task] || row.task}</td><td>${row.model}</td><td class="n">${row.calls}</td><td class="n">${row.items}</td>
           <td class="n">${group(row.input_tokens)}</td><td class="n">${group(row.output_tokens)}</td><td class="n">${row.failures}</td><td class="n">${usd(row.cost_usd)}</td></tr>`)}</tbody></table></div>`}</section>
   </div>`;

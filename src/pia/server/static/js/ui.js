@@ -165,8 +165,19 @@ export function ChipGroup({ options, value, onChange, label }) {
 }
 
 export function Tabs({ tabs, value, onChange }) {
-  return html`<div class="tabs" role="tablist">
-    ${tabs.map((tab) => html`<button role="tab" aria-selected=${tab.value === value} onClick=${() => onChange(tab.value)}>
+  // Arrow keys move between tabs (the selected one is the only tab stop), as the tab pattern expects.
+  const key = (event) => {
+    const step = { ArrowRight: 1, ArrowLeft: -1 }[event.key];
+    if (!step) return;
+    const at = tabs.findIndex((tab) => tab.value === value);
+    const next = tabs[(at + step + tabs.length) % tabs.length];
+    const list = event.currentTarget;
+    onChange(next.value);
+    requestAnimationFrame(() => list.querySelector('[aria-selected=true]')?.focus());
+    event.preventDefault();
+  };
+  return html`<div class="tabs" role="tablist" onKeyDown=${key}>
+    ${tabs.map((tab) => html`<button role="tab" aria-selected=${tab.value === value} tabindex=${tab.value === value ? 0 : -1} onClick=${() => onChange(tab.value)}>
       ${tab.label}${tab.count !== undefined && tab.count !== null && html`<span class="n">${tab.count}</span>`}</button>`)}
   </div>`;
 }
@@ -506,7 +517,7 @@ export function NotificationsDrawer({ onClose, refreshBoot }) {
   };
   return html`<div>
     <div class="scrim scrim-drawer" onClick=${onClose}></div>
-    <aside class="drawer" role="dialog" aria-modal="true" aria-label="Notifications" ref=${box}>
+    <div class="drawer" role="dialog" aria-modal="true" aria-label="Notifications" ref=${box}>
       <div class="drawer-head"><h2>Notifications</h2>
         ${unseen > 0 && html`<button class="btn small quiet" onClick=${markAll}>Mark all seen</button>`}
         <${IconButton} icon="x" label="Close (Esc)" onClick=${onClose} /></div>
@@ -519,7 +530,7 @@ export function NotificationsDrawer({ onClose, refreshBoot }) {
           <span class="r"><span class=${"lvl-tag " + n.level}>${LEVEL_NAMES[n.level] || n.level}</span>  ·  ${n.reason}  ·  ${timeAgo(n.created_at)}</span></button>`)}`)}
       </div>
       <div class="drawer-foot"><span class="meta">${unseen} unseen</span><a class="textlink" href="#/settings" onClick=${onClose}>Notification settings</a></div>
-    </aside>
+    </div>
   </div>`;
 }
 
@@ -530,7 +541,7 @@ export const SHORTCUTS = [
 ];
 
 export function ShortcutTable() {
-  return html`<div class="table-wrap"><table class="grid"><tbody>${SHORTCUTS.map(([keys, what]) => html`<tr><td class="keys"><kbd>${keys}</kbd></td><td>${what}</td></tr>`)}</tbody></table></div>`;
+  return html`<div class="table-wrap" tabindex="0"><table class="grid"><tbody>${SHORTCUTS.map(([keys, what]) => html`<tr><td class="keys"><kbd>${keys}</kbd></td><td>${what}</td></tr>`)}</tbody></table></div>`;
 }
 
 export function Shortcuts({ onClose }) {

@@ -414,11 +414,6 @@ assert.equal(u.deadlineText(9), "9 days left");
 assert.equal(u.deadlineText(-1), "closed yesterday");
 assert.equal(u.deadlineText(-4), "closed 4 days ago");
 
-assert.equal(u.tier({ score: 0.8 }), "lead");
-assert.equal(u.tier({ score: 0.6 }), "standard");
-assert.equal(u.tier({ score: 0.2 }), "minor");
-assert.equal(u.tier({}), "minor");
-assert.deepEqual([0, 0.1, 0.5, 0.9, 1, 5, undefined].map(u.marks), [0, 0, 2, 4, 4, 4, 0]);
 assert.equal(u.levelLabel(3), "Priority");
 assert.equal(u.levelLabel(null), "Not rated");
 assert.equal(u.plural(1, "item"), "1 item");

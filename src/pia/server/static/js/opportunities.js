@@ -38,7 +38,7 @@ function OppRow({ opportunity: o, route, onTrack, closed = false }) {
 
 function TrackingBoard({ list, route }) {
   const columns = [["interested", "Interested"], ["planning", "Planning"], ["applied", "Applied"], ["outcome", "Outcome"]];
-  return html`<div class="board">${columns.map(([key, label]) => {
+  return html`<div class="board"><h2 class="sr">Tracking board</h2>${columns.map(([key, label]) => {
     const column = list.filter((o) => (key === "outcome" ? ["accepted", "rejected"].includes(o.status) : o.status === key));
     return html`<div class="col" key=${key}><h3>${label}<span>${column.length}</span></h3>
       ${column.length === 0 ? html`<p class="meta ticket-empty">None</p>` : column.map((o) => html`<a class="ticket" href=${itemHref(route, o.item_id)}><b>${o.programme || o.title}</b>

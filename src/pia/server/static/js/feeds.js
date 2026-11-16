@@ -137,6 +137,7 @@ export function Space({ boot, refreshBoot, route, slug }) {
         <${Icon} name="check" size=${15} /> Mark shown as read</button>`}
     </div>
     ${view === "important" && html`<p class="feed-note">Ordered by significance and fit with your interests. Older items stay while they still matter.</p>`}
+    <h2 class="sr">${view === "latest" ? "Latest items" : "Important items"}</h2>
     ${body}
     <${MoreButton} feed=${feed} />
   </div>`;
@@ -166,6 +167,7 @@ export function Topic({ refreshBoot, route, id }) {
         <div class="rate" role="group" aria-label=${`Your interest in ${topic.name}`}>${RATINGS.map(([level, label]) => html`<button class=${level < 0 ? "neg" : ""} aria-pressed=${topic.level === level}
           onClick=${() => rate(topic.level === level ? null : level)}>${label}</button>`)}</div></div>
     </header>
+    <h2 class="sr">Items about ${topic.name}</h2>
     ${feed.error && html`<${ErrorNote} message=${feed.error} retry=${feed.reload} />`}
     ${feed.loading && !feed.items.length && html`<${Skeleton} rows=${5} />`}
     ${!feed.loading && !feed.error && !visible.length && html`<${Empty} title="Nothing here yet">PIA has not matched any item to this yet.<//>`}
@@ -209,6 +211,7 @@ export function Library({ boot, refreshBoot, route }) {
     <header class="page-head"><h1>Library</h1><p>What you kept, what you have read, and what you set aside. Saved items stay until you remove them.</p></header>
     <${Tabs} value=${tab} onChange=${(value) => setQuery(route, { tab: value === "saved" ? undefined : value })}
       tabs=${[["saved", "Saved"], ["read", "Read"], ["dismissed", "Dismissed"]].map(([value, label]) => ({ value, label, count: count(value) }))} />
+    <h2 class="sr">${tab === "saved" ? "Saved items" : tab === "read" ? "Items you have read" : "Dismissed items"}</h2>
     ${body}
     <${MoreButton} feed=${feed} />
   </div>`;
@@ -243,10 +246,11 @@ export function Search({ boot, refreshBoot, route }) {
   else body = html`<ul class="feed">${visible.map((item, index) => html`<${Row} key=${item.id} item=${item} href=${href(item)} act=${act} cursor=${cursor === index} showSpace=${true} highlight=${q} />`)}</ul>`;
 
   return html`<div class="page">
-    <header class="page-head"><form class="form-row" role="search" onSubmit=${submit}>
+    <header class="page-head"><h1 class="sr">Search</h1><form class="form-row" role="search" onSubmit=${submit}>
       <input class="field big" value=${draft} onInput=${(event) => setDraft(event.target.value)} aria-label="Search everything PIA holds" placeholder="Search everything PIA holds" />
       <button class="btn primary big">Search</button></form>
       <p class="meta">${q ? (feed.loading && !feed.items.length ? "Searching…" : `${plural(feed.total, "result")} for “${q}”. Titles, summaries, topics and source text.`) : "Search titles, summaries, topics and the text sources supplied."}</p></header>
+    ${q && html`<h2 class="sr">Results and filters</h2>`}
     ${q ? html`<div class="search-layout">
       <aside class="facets" aria-label="Refine results">
         <div><h3>Sort</h3>${SORTS.map(([value, label]) => html`<button aria-pressed=${view === value} onClick=${() => setQuery(route, { view: value === "relevance" ? undefined : value })}>${label}</button>`)}</div>

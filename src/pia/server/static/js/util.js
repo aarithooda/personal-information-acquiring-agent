@@ -68,19 +68,6 @@ export function deadlineText(daysLeft) {
   return `${daysLeft} days left`;
 }
 
-// Importance in three typographic tiers; the thresholds mirror the notification defaults.
-export function tier(item) {
-  const score = item.score ?? 0;
-  if (score >= 0.72) return "lead";
-  if (score >= 0.56) return "standard";
-  return "minor";
-}
-
-// 0-1 -> how many of four signal marks are lit.
-export function marks(value) {
-  return Math.max(0, Math.min(4, Math.round((value ?? 0) * 4)));
-}
-
 export const KIND_LABELS = {
   paper: "Research paper", repo: "Repository", news: "News", article: "Article", post: "Discussion",
   release: "Release", opportunity: "Opportunity", announcement: "Announcement",

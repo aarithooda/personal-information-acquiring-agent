@@ -668,3 +668,10 @@ table.grid.sources td .sub { max-width: 100%; }
 .panel.top { padding-top: var(--s-6); }
 .field.time { min-width: 0; width: 120px; }
 @media (max-width: 899px) { table.grid tr .row-acts { opacity: 1; } }
+
+/* accessibility pass */
+.textlink { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.textlink:hover { text-decoration-thickness: 2px; }
+.section-head a, .section-head button.link { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.row.dismissed { opacity: 1; }
+.row.dismissed h3 a { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1px; }

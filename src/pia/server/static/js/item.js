@@ -273,7 +273,7 @@ export function ReaderSheet({ id, close, refreshBoot, route }) {
 
   return html`<div>
     <div class="scrim" onClick=${close}></div>
-    <aside class=${"sheet" + (focus ? " focus" : "")} role="dialog" aria-modal="true" aria-label=${item ? item.title : "Item"} tabindex="-1" ref=${box}>
+    <div class=${"sheet" + (focus ? " focus" : "")} role="dialog" aria-modal="true" aria-label=${item ? item.title : "Item"} tabindex="-1" ref=${box}>
       <div class="sheet-bar">
         <${IconButton} icon="x" label="Close (Esc)" onClick=${close} />
         ${at >= 0 && html`<${IconButton} icon="up" label="Previous (K)" onClick=${() => step(-1)} className=${at === 0 ? "off" : ""} />
@@ -323,6 +323,6 @@ export function ReaderSheet({ id, close, refreshBoot, route }) {
           </aside>
         </article>`}
       </div>
-    </aside>
+    </div>
   </div>`;
 }
