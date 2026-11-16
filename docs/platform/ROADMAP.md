@@ -1,6 +1,10 @@
 # Roadmap, status and handoff
 
-The single place that says what is done, how well it is verified, and what comes next. Updated 2026-11-16.
+The handover document: what is done, how well it is verified, what remains and who it is waiting on.
+Updated 2026-11-16.
+
+The status of every requirement in the original brief, one by one, is in [COMPLETION.md](COMPLETION.md). This
+file works at the level of capabilities and of the work still to do.
 
 Status words mean exactly this:
 
@@ -38,6 +42,7 @@ Status words mean exactly this:
 | Container image | Implemented | `Dockerfile` written; **not built or run here** (Docker is not installed on the build machine) |
 | Cloud deployment | Blocked | `Dockerfile` and guide exist; deploying costs money and is the owner's decision |
 | Cost tracking | Tested | Per call, per task; daily budget enforced |
+| Continuous integration | Tested | `.github/workflows/tests.yml` runs the suite on every pull request targeting `main`: Ubuntu (Python 3.11, 3.12) and Windows (3.11), no secrets. Its first run found one environment-only failure (forced terminal colours in `--help` output), fixed in the workflow |
 
 Automated tests: 868, no network, no keys.
 
@@ -59,47 +64,97 @@ Running against real services found things no unit test had, each now fixed and 
 
 ## Open questions for the owner
 
-These are the decisions engineering cannot make. Each has a provisional default so nothing is blocked on it.
+They are the first table under Remaining work below, with what each one unlocks.
 
-1. **Organisations to monitor for opportunities** (the 15 to 20 you mentioned). Default: none; the space shows
-   Codeforces contests only. Add them under Opportunities with a careers or programme page address.
-2. **How wide the opportunities search should be.** Devpost hackathons and four opportunity aggregators are
-   verified and waiting under Sources, Suggested. Default: off.
-3. **University announcements.** The institute's website could not be reached from here to verify a feed or a
-   notices page. Options: give a page address to watch, or connect university mail (`pia gmail-connect`).
-   Default: the space exists but has no source.
-4. **Topic ratings.** The starting profile is derived from your brief and `config/interests.toml` (43 topics
-   rated). The Interests page is the questionnaire; anything unrated is neutral.
-5. **Which suggested sources to follow.** 65 are waiting, including high-volume general news (TechCrunch, Ars
-   Technica, BBC World, Al Jazeera) that was left off to protect signal.
-6. **Hosting.** See OPERATIONS.md for options and rough costs. Default: runs on this computer.
-7. **Merging.** The branch `platform-v2` is published as a single commit (squashed on the owner's instruction so
-   that an earlier local version of one test file, which named a private detail, never left the machine). It
-   has not been merged into `main`; that is the owner's call, by pull request when ready.
+## Remaining work
+
+Four groups, in the order they are worth doing. Nothing here blocks daily use on this computer.
+
+### 1. Waiting on the owner
+
+Decisions, configuration or credentials that only the owner can supply. Each has a default, so PIA runs meanwhile.
+
+| What | Why it matters | Default until then |
+|---|---|---|
+| Review and merge pull request 1 (`platform-v2` into `main`) | `main` still holds v1 only | The branch is published; `main` is untouched |
+| List the 15 to 20 organisations to monitor (Opportunities, with a careers or programme page each) | Unlocks the opportunities space | Codeforces contests only |
+| Decide how wide the opportunities search is | Devpost and four aggregators are verified and waiting under Sources, Suggested | Off |
+| Give a notices page for the university, or connect university mail | The University space has no source | Empty space |
+| Authorise read-only Gmail (`pia gmail-connect`, see GMAIL.md) | University mail; the institute may block third-party access | Not connected |
+| Review the starting interest profile on the Interests page | 43 topics were rated from the brief and old notes, unreviewed | Used as is |
+| Decide on the 65 suggested sources | Includes high-volume general news left off to protect signal | Not followed |
+| Run `companion\install.ps1` once | Desktop notifications on sign-in | Notifications appear in the app only |
+| Choose hosting (OPERATIONS.md: about $3 to $6 a month) | Acquisition while the laptop is off; other devices | Runs on this computer |
+| Say whether the interface meets the bar for polish | A matter of the owner's judgement | Not reviewed |
+
+### 2. Real-world validation still owed
+
+Built and covered by tests with fixtures or fakes, but not yet proven against the real thing. None needs new
+design; each needs to be run once and looked at.
+
+| What | How to validate | Depends on |
+|---|---|---|
+| Opportunity extraction on real internship postings | Run it on the first organisations' postings; check deadlines and eligibility by hand | Organisations chosen |
+| Page watcher on a real careers or notices page | Add one through Opportunities and compare with the page | A page address |
+| Adding a feed through the interface | Follow one new site from Sources, Add a source | Nothing |
+| The reader (full text for arXiv, excerpt elsewhere) | Use "Fetch the text" on a paper and on an article | Nothing |
+| Link-based source discovery | It runs daily; needs more history before it proposes anything | Time |
+| Model-suggested source discovery and source evaluation | "Look for new sources" on the Sources page; judge what it proposes | Nothing (a few cents of Groq use) |
+| "Subjects PIA has noticed" | Review the list on the Interests page with real data | Nothing |
+| Clicking a desktop notification opens the item | Click one | Companion installed |
+| The container image | Build and run it once | Docker, hosting decision |
+| Auth behind a real HTTPS proxy | Sign in to the deployed instance; confirm the cookie is Secure | Deployment |
+| Restoring from a backup | Rehearse once on a copy | Nothing |
+| The ranking constants | A blind-labelled benchmark on a fresh sample (the v1 corpus is spent) | The owner's labelling time |
+
+### 3. Gaps against the brief
+
+Requirements that are partial or not implemented (COMPLETION.md has the detail). Smallest first.
+
+| Gap | Size |
+|---|---|
+| Notes field for a tracked opportunity (the API already stores notes) | Small |
+| Time-window filter in feeds (the API already accepts one) | Small |
+| Change a source's fetch interval and spaces in the interface (API only today) | Small |
+| Visiting a space as a learning signal | Small |
+| Add or rename a space in the app (today: `config/taxonomy.toml` and `pia seed`) | Small |
+| Fix the order-dependent v1 test (see limitations) | Small |
+| Follow a researcher directly (for example arXiv by author) | Medium |
+| Feedback that changes acquisition (propose pausing a source repeatedly marked poor) | Medium |
+| Earlier developments written into briefs, and a single view of one development over time | Medium |
+| Merge different spellings of one entity; relations between entities | Medium |
+| Automated browser tests; a load test at tens of thousands of items | Medium |
+| Alerting when the agent or many sources fail (today: the System page only) | Medium |
+| Market data (prices, indices), if wanted | Medium, needs a data source decision |
+| A reputation signal for sources that is not a model's opinion | Open question |
+
+### 4. Later
+
+Deferred in the PRD and still deferred: a mobile app and push, multi-user accounts, embeddings-based similarity,
+other notification channels, an autonomous dossier system. Retire the v1 pipeline once a platform benchmark
+supersedes the published evaluation.
 
 ## Known limitations and assumptions
 
 - Ranking constants are named priors in `src/pia/intel/score.py`. No labelled data for the platform exists; the
-  v1 benchmark corpus is spent and was not used to tune anything. A new benchmark is the right next evidence step.
+  v1 benchmark corpus is spent and was not used to tune anything.
 - A model's significance score is trusted only as one input (65% of importance), never as a threshold alone.
 - Popularity is a percentile within each metric; sources with no public metric get a neutral value.
 - Model-free mode cannot tell a spam repository from a good one except through the clone-swarm rule.
+- About 1,230 items were still waiting for model assessment on 2026-11-16; the agent clears roughly 160 a cycle.
 - Time zone for quiet hours defaults to India (UTC+5:30) and is a setting.
 - One user. The schema has no user column; multi-user would be a migration.
-
-## Next steps, in order
-
-1. Owner answers the open questions above (organisations first: it unlocks the opportunities space).
-2. Run model-suggested source discovery live and review the quality of what it proposes.
-3. Run opportunity extraction live on real postings once organisations are chosen; check deadlines by hand.
-4. Deploy (after the hosting decision), then install the companion against the deployed address.
-5. Connect university mail, if wanted.
-6. Build a platform benchmark: blind labels on a fresh sample, to test the ranking constants.
-7. Retire the v1 pipeline once that benchmark supersedes the published one.
+- One v1 test is order-dependent: `tests/test_bench_cli.py::test_an_incomplete_arm_is_not_saved_unless_asked_and_can_be_resumed`
+  fails if `tests/test_cli.py` runs before it in the same process (a logging handler left bound to a closed
+  stream). It passes in the default order, locally and in CI, and was left alone rather than rewritten.
+- The pull request is one squashed commit plus later commits on top. It was squashed once, on the owner's
+  instruction, so that an earlier local version of one test file, which named a private detail, never left the
+  machine.
 
 ## Handoff notes for the next session
 
-- Branch `platform-v2`. v1 code is untouched except: `models.py` (two optional fields), `llm/client.py` (records
+- Branch `platform-v2`, pull request 1 into `main`, open and unmerged. Do not merge it or change `main` without
+  the owner saying so. v1 code is untouched except: `models.py` (two optional fields), `llm/client.py` (records
   token usage), `cli.py` (registers platform commands; the old `web` command is gone; `--triage` now defaults to `llm`).
 - Platform code: `src/pia/store`, `acquire`, `intel`, `notify`, `integrations`, `server`, plus `worker.py` and
   `platform_cli.py`. Tests: `tests/test_platform_*.py` with helpers in `tests/platform_helpers.py`.

@@ -129,6 +129,8 @@ than the LLM triage, so no claim of superiority is made and nothing depends on i
 
 Design documents: [product requirements](docs/platform/PRD.md), [architecture and decisions](docs/platform/ARCHITECTURE.md),
 [audit of v1](docs/platform/AUDIT.md), [sources](docs/platform/SOURCES.md), [operations](docs/platform/OPERATIONS.md).
+Status: [what remains and who it waits on](docs/platform/ROADMAP.md), and
+[every original requirement with its status](docs/platform/COMPLETION.md).
 
 ## Security and privacy
 
@@ -154,7 +156,8 @@ Design documents: [product requirements](docs/platform/PRD.md), [architecture an
 pytest
 ```
 
-About 830 tests, no network (a guard makes any real connection fail), no API keys. They cover acquisition and
+868 tests, no network (a guard makes any real connection fail), no API keys. GitHub Actions runs them on every
+pull request to `main`, on Ubuntu and Windows. They cover acquisition and
 failure handling, deduplication, migrations, ranking, personalisation, state transitions, opportunity extraction
 and deadlines, notifications, the API, authentication, the guarded fetcher, and the browser-side logic (with Node).
 

@@ -66,7 +66,7 @@ def test_the_readme_documents_the_jev_setup_and_privacy_of_the_profile():
 
 
 def test_the_platform_documents_exist_and_the_roadmap_tracks_status():
-    for name in ("PRD.md", "AUDIT.md", "ARCHITECTURE.md", "ROADMAP.md", "SOURCES.md", "OPERATIONS.md", "GMAIL.md"):
+    for name in ("PRD.md", "AUDIT.md", "ARCHITECTURE.md", "ROADMAP.md", "COMPLETION.md", "SOURCES.md", "OPERATIONS.md", "GMAIL.md"):
         assert (PLATFORM_DOCS / name).is_file(), name
     roadmap = (PLATFORM_DOCS / "ROADMAP.md").read_text(encoding="utf-8")
     for needed in ("| Tested |", "| Implemented |", "| Blocked |", "Open questions for the owner", "Handoff notes"):
