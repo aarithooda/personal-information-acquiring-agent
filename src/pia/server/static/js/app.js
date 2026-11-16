@@ -2,7 +2,7 @@
 import { html, render, useCallback, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
 import { Feed, Home, TopicPage } from "./legacy.js";
-import { ItemPanel } from "./item.js";
+import { ReaderSheet } from "./item.js";
 import { Interests, Notifications, Opportunities, Sources, System } from "./pages.js";
 import { Empty, Icon, IconButton, NotificationsDrawer, Palette, Shortcuts, Toasts, applyTheme, go, hueStyle } from "./ui.js";
 import { buildRoute, foldOpportunities, parseRoute, priorityDomains, timeAgo } from "./util.js";
@@ -207,7 +207,7 @@ function App() {
       ${page}
     </main>
     <${TabBar} route=${route} />
-    ${route.query.item && html`<${ItemPanel} key=${route.query.item} id=${Number(route.query.item)} close=${closeItem} refreshBoot=${refreshBoot} route=${route} boot=${boot} />`}
+    ${route.query.item && html`<${ReaderSheet} id=${Number(route.query.item)} close=${closeItem} refreshBoot=${refreshBoot} route=${route} boot=${boot} />`}
     ${drawer && html`<${NotificationsDrawer} onClose=${() => setDrawer(false)} refreshBoot=${refreshBoot} />`}
     ${palette && html`<${Palette} onClose=${() => setPalette(false)} domains=${boot.domains} />`}
     ${keys && html`<${Shortcuts} onClose=${() => setKeys(false)} />`}

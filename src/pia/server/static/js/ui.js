@@ -75,6 +75,18 @@ export function setReadingContext(ids, label = "") {
   readingContext.label = label;
 }
 
+// The reader and the pages behind it tell each other about state changes, so a list is never stale after the sheet closes.
+const itemListeners = new Set();
+export function publishItem(id, change) {
+  itemListeners.forEach((listener) => listener(id, change));
+}
+export function useItemSync(patchItems) {
+  useEffect(() => {
+    itemListeners.add(patchItems);
+    return () => itemListeners.delete(patchItems);
+  }, [patchItems]);
+}
+
 // ---------- loading ----------
 
 // Load something, track loading and error, and allow a reload.

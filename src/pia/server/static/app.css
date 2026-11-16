@@ -616,3 +616,14 @@ button.textlink { display: inline; text-align: left; }
 .agent .pulse.off { background: var(--ink-3); }
 .toast.error { background: var(--alert); color: var(--paper); }
 .textlink.block { display: block; }
+.icon-btn.off { opacity: 0.35; pointer-events: none; }
+.elig-line { margin-top: 4px; }
+.progress-block { display: grid; gap: var(--s-3); }
+.opp-facts { display: grid; gap: var(--s-5); }
+.stack { display: grid; gap: var(--s-3); }
+.read-further { display: grid; gap: var(--s-3); justify-items: start; }
+.feedback-wrap { display: grid; gap: var(--s-3); }
+.source-text p + p { margin-top: 1em; }
+.side .note { margin-bottom: var(--s-4); }
+.side .topics a em { margin-left: var(--s-3); }
+.sheet:focus, .drawer:focus, .palette:focus { outline: none; }
