@@ -1,7 +1,8 @@
 // Opportunities, Sources, Interests, Notifications and System.
 import { html, useState } from "../vendor/preact-htm.js";
 import { api } from "./api.js";
-import { Empty, ErrorNote, Icon, Loading, Segmented, Tabs, hueStyle, toast, useLoad } from "./ui.js";
+import { Loading } from "./legacy.js";
+import { Empty, ErrorNote, Icon, Segmented, Tabs, hueStyle, toast, useLoad } from "./ui.js";
 import { OPPORTUNITY_TYPES, TRACK_STATUSES, buildRoute, bytes, dateTime, plural, timeAgo, usd } from "./util.js";
 
 function fail(error) {

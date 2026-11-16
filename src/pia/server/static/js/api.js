@@ -12,6 +12,12 @@ export function setUnauthorisedHandler(handler) {
   onUnauthorised = handler;
 }
 
+// The shell shows a banner while the server cannot be reached (a fetch that never gets an answer).
+let onReachability = () => {};
+export function setReachabilityHandler(handler) {
+  onReachability = handler;
+}
+
 async function request(method, path, body) {
   let response;
   try {
@@ -22,8 +28,10 @@ async function request(method, path, body) {
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
+    onReachability(false);
     throw new ApiError(0, "PIA is not reachable. Check that it is running, then try again.");
   }
+  onReachability(true);
   if (response.status === 401 && path !== "/api/login") {
     onUnauthorised();
     throw new ApiError(401, "Sign in to continue.");

@@ -1,7 +1,8 @@
 // The reader: one item in full, in a panel over whatever page the owner was on.
 import { html, useEffect, useRef, useState } from "../vendor/preact-htm.js";
 import { api } from "./api.js";
-import { ErrorNote, Icon, Loading, hueStyle, toast } from "./ui.js";
+import { Loading } from "./legacy.js";
+import { ErrorNote, Icon, hueStyle, toast } from "./ui.js";
 import { KIND_LABELS, OPPORTUNITY_TYPES, TRACK_STATUSES, buildRoute, deadlineText, fullDate, hostOf, safeUrl, timeAgo } from "./util.js";
 
 const FEEDBACK = [
