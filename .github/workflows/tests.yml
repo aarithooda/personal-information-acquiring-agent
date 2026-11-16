@@ -1,0 +1,63 @@
+# Runs the automated test suite on every pull request that targets main.
+#
+# The suite needs no API keys and no network: a guard in tests/conftest.py makes any real connection fail, so
+# this workflow has no secrets and only read access to the repository.
+name: Tests
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: pytest (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, python: "3.11" }
+          - { os: ubuntu-latest, python: "3.12" }
+          # PIA is used on Windows (launcher, companion), and the launcher tests only run there.
+          - { os: windows-latest, python: "3.11" }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # The web app's pure logic is tested with Node (tests/test_platform_misc.py); without Node those tests skip.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # Installed into .venv, exactly as the README's quickstart does: the Windows launcher (run-pia.bat) looks
+      # for PIA there, and tests/test_launcher.py runs the real launcher.
+      - name: Install PIA with its test dependencies
+        shell: bash
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" = "Windows" ]; then PIA_PYTHON=".venv/Scripts/python.exe"; else PIA_PYTHON=".venv/bin/python"; fi
+          "$PIA_PYTHON" -m pip install --upgrade pip
+          "$PIA_PYTHON" -m pip install -e ".[dev]"
+          echo "PIA_TEST_PYTHON=$PIA_PYTHON" >> "$GITHUB_ENV"
+
+      - name: Run the test suite
+        shell: bash
+        env:
+          # On GitHub Actions the CLI library (Typer) forces coloured terminal output, which puts escape codes
+          # into `--help` text that one test reads. This is Typer's own switch for running under test.
+          _TYPER_FORCE_DISABLE_TERMINAL: "1"
+        run: '"$PIA_TEST_PYTHON" -m pytest -q'

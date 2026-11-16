@@ -2,8 +2,6 @@
 
 import logging
 import sys
-import threading
-import webbrowser
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -60,10 +58,10 @@ def main(
     config: Path = typer.Option(DEFAULT_SOURCES, help="Sources config file."),
     profile: Path = typer.Option(DEFAULT_PROFILE, help="Your interest profile (TOML)."),
     triage: str = typer.Option(
-        "auto",
+        "llm",
         "--triage",
         envvar="PIA_TRIAGE",
-        help="Stage 1: jev (decision model + your profile), llm (gpt-oss), or auto (Jev if a key and a profile exist).",
+        help="Stage 1 of the v1 briefing: llm (Groq gpt-oss, the default), jev (decision model + your profile), or auto (Jev if a key and a profile exist). Jev is used only when asked for.",
     ),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show warnings and retries."),
 ) -> None:
@@ -286,49 +284,10 @@ def doctor(
     typer.echo("\nAll good." + ("" if online else " (Add --online to also test the network.)"))
 
 
-LOCAL_HOSTS = ("127.0.0.1", "localhost")
+# The platform's commands (serve, run-once, seed, import-legacy, backup, set-password, add-device, web).
+from pia.platform_cli import register as _register_platform  # noqa: E402
 
-
-def _load_web():
-    """Import the optional web dependencies only when `pia web` runs, so the core needs none of them."""
-    import uvicorn
-
-    from pia.web.app import create_app
-
-    return uvicorn, create_app
-
-
-def _open_later(url: str) -> None:
-    threading.Timer(1.0, webbrowser.open, [url]).start()  # give the server a moment to start
-
-
-@app.command()
-def web(
-    ctx: typer.Context,
-    host: str = typer.Option("127.0.0.1", help="Address to listen on. Local addresses only."),
-    port: int = typer.Option(8765, help="Port to listen on."),
-    open_browser: bool = typer.Option(False, "--open", help="Open the page in your browser."),
-) -> None:
-    """Start the local web UI: New, Library and Favorites. Press Ctrl+C to stop."""
-    if host not in LOCAL_HOSTS:
-        typer.echo(
-            f"Refusing to listen on {host!r}: the web UI is local-only, because it shows your personal "
-            "reading history. Use 127.0.0.1 or localhost.",
-            err=True,
-        )
-        raise typer.Exit(1)
-    try:
-        uvicorn, create_app = _load_web()
-    except ImportError:
-        typer.echo('The web UI needs extra packages. Install them with:  pip install -e ".[web]"', err=True)
-        raise typer.Exit(1)
-
-    web_app = create_app(ctx.obj.db)  # also upgrades the database schema if needed, like `pia` does
-    url = f"http://{host}:{port}"
-    typer.echo(f"PIA web UI: {url}   (Ctrl+C to stop)")
-    if open_browser:
-        _open_later(url)
-    uvicorn.run(web_app, host=host, port=port, log_level="warning")
+_register_platform(app)
 
 
 if __name__ == "__main__":

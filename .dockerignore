@@ -1,0 +1,14 @@
+.git
+.venv
+.env*
+data
+tests
+benchmarks
+benchmark_v2
+docs
+companion
+**/__pycache__
+*.db
+*.lnk
+config/personal.toml
+config/interests.toml

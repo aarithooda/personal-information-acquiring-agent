@@ -1,0 +1,1690 @@
+# PIA's vetted source catalogue. Read by src/pia/store/seed.py.
+#
+# Every RSS entry here was fetched and checked on 2026-11-15: HTTP 200, a real feed, at least three entries, the
+# newest within 90 days. `tier = "core"` sources are switched on when the database is first seeded; `optional`
+# ones are seeded as CANDIDATES, i.e. recommendations on the Sources page that you can accept or reject.
+# High-volume general news, aggregators and opportunity listings are deliberately optional.
+#
+# Seeding only ADDS sources that are missing (matched by name). Pausing, removing or re-tuning a source in the
+# app is never undone by this file. See docs/platform/SOURCES.md for coverage, reliability and known gaps.
+
+# ---------- APIs (the adapters v1 proved) ----------
+
+[[source]]
+name = "Hacker News"
+kind = "hn"
+homepage = "https://news.ycombinator.com"
+description = "Stories that reached 150 points on Hacker News."
+domains = ["software", "ai", "startups"]
+tier = "core"
+trust = 0.6
+interval = 60
+general = true
+config = { min_points = 150, max_results = 100 }
+
+[[source]]
+name = "Hugging Face Daily Papers"
+kind = "hf_papers"
+homepage = "https://huggingface.co/papers"
+description = "Community-curated machine-learning papers with at least 10 upvotes."
+domains = ["ai"]
+tier = "core"
+trust = 0.75
+interval = 360
+config = { min_upvotes = 10 }
+
+[[source]]
+name = "GitHub: new AI repositories"
+kind = "github"
+homepage = "https://github.com"
+description = "Repositories created recently that are already gaining stars (AI, LLM and agent projects)."
+domains = ["ai", "software"]
+tier = "core"
+trust = 0.55
+interval = 360
+general = true
+config = { query = "llm OR agent OR ai", min_stars = 80, max_results = 30 }
+
+[[source]]
+name = "arXiv: AI"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in cs.AI, cs.CL, cs.LG, cs.MA (the newest 80 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["ai"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["cs.AI", "cs.CL", "cs.LG", "cs.MA"], max_results = 80 }
+
+[[source]]
+name = "arXiv: Software & algorithms"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in cs.SE, cs.PL, cs.DS, cs.DC (the newest 40 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["software"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["cs.SE", "cs.PL", "cs.DS", "cs.DC"], max_results = 40 }
+
+[[source]]
+name = "arXiv: Mathematics"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in math.NT, math.CO, math.AG, math.PR, math.AP, math.LO, math.CT (the newest 60 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["mathematics"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["math.NT", "math.CO", "math.AG", "math.PR", "math.AP", "math.LO", "math.CT"], max_results = 60 }
+
+[[source]]
+name = "arXiv: Theoretical physics"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in hep-th, gr-qc, quant-ph (the newest 60 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["physics"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["hep-th", "gr-qc", "quant-ph"], max_results = 60 }
+
+[[source]]
+name = "arXiv: Robotics"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in cs.RO (the newest 40 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["robotics"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["cs.RO"], max_results = 40 }
+
+[[source]]
+name = "arXiv: Quantitative finance"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in q-fin.CP, q-fin.MF, q-fin.PM, q-fin.ST, q-fin.TR, q-fin.PR, q-fin.RM (the newest 30 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["quant-finance"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["q-fin.CP", "q-fin.MF", "q-fin.PM", "q-fin.ST", "q-fin.TR", "q-fin.PR", "q-fin.RM"], max_results = 30 }
+
+[[source]]
+name = "arXiv: Security"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in cs.CR (the newest 30 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["cs.CR"], max_results = 30 }
+
+[[source]]
+name = "arXiv: Astrophysics"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in astro-ph.CO, astro-ph.HE, astro-ph.EP, astro-ph.GA (the newest 40 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["space"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["astro-ph.CO", "astro-ph.HE", "astro-ph.EP", "astro-ph.GA"], max_results = 40 }
+
+[[source]]
+name = "arXiv: Economics"
+kind = "arxiv"
+homepage = "https://arxiv.org"
+description = "New preprints in econ.GN, econ.EM, econ.TH (the newest 20 each fetch; arXiv has no popularity signal, so this is a sample, not everything)."
+domains = ["economics"]
+tier = "core"
+trust = 0.6
+interval = 720
+config = { categories = ["econ.GN", "econ.EM", "econ.TH"], max_results = 20 }
+
+[[source]]
+name = "Codeforces contests"
+kind = "json_api"
+homepage = "https://codeforces.com/contests"
+description = "Upcoming Codeforces rounds, from the official API."
+domains = ["hackathons"]
+tier = "core"
+trust = 0.8
+interval = 720
+purpose = "opportunities"
+config = { preset = "codeforces" }
+
+[[source]]
+name = "Devpost hackathons"
+kind = "json_api"
+homepage = "https://devpost.com/hackathons"
+description = "Open and upcoming hackathons listed on Devpost, from its public API."
+domains = ["hackathons"]
+tier = "optional"
+trust = 0.65
+interval = 720
+purpose = "opportunities"
+reason = "A broad hackathon listing. Left off until you decide how wide the opportunities search should be."
+config = { preset = "devpost" }
+
+# ---------- RSS / Atom, verified 2026-11-15 ----------
+
+[[source]]
+name = "OpenAI News"
+kind = "rss"
+url = "https://openai.com/news/rss.xml"
+homepage = "https://openai.com/"
+description = "Official OpenAI announcements and research posts"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Google DeepMind Blog"
+kind = "rss"
+url = "https://deepmind.google/blog/rss.xml"
+homepage = "https://deepmind.google/"
+description = "Official Google DeepMind research and product posts"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Google AI (The Keyword)"
+kind = "rss"
+url = "https://blog.google/innovation-and-ai/technology/ai/rss/"
+homepage = "https://blog.google/"
+description = "Google blog posts on AI products and research"
+domains = ["ai"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Hugging Face Blog"
+kind = "rss"
+url = "https://huggingface.co/blog/feed.xml"
+homepage = "https://huggingface.co/"
+description = "Open-source ML tooling, model releases and community posts"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "BAIR Blog"
+kind = "rss"
+url = "https://bair.berkeley.edu/blog/feed.xml"
+homepage = "https://bair.berkeley.edu/"
+description = "Berkeley AI Research long-form research explainers"
+domains = ["ai"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Simon Willison"
+kind = "rss"
+url = "https://simonwillison.net/atom/everything/"
+homepage = "https://simonwillison.net/"
+description = "Practical notes on LLMs, tools and the AI ecosystem"
+domains = ["ai", "software"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "Microsoft Research Blog"
+kind = "rss"
+url = "https://www.microsoft.com/en-us/research/feed/"
+homepage = "https://www.microsoft.com/"
+description = "Microsoft Research news and papers"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Import AI"
+kind = "rss"
+url = "https://importai.substack.com/feed"
+homepage = "https://importai.substack.com/"
+description = "Weekly AI research newsletter by Jack Clark"
+domains = ["ai"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Latent Space"
+kind = "rss"
+url = "https://latent.space/feed"
+homepage = "https://latent.space/"
+description = "AI engineering podcast and newsletter"
+domains = ["ai"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Ahead of AI (Sebastian Raschka)"
+kind = "rss"
+url = "https://magazine.sebastianraschka.com/feed"
+homepage = "https://magazine.sebastianraschka.com/"
+description = "Technical LLM and ML newsletter"
+domains = ["ai"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "NVIDIA Blog"
+kind = "rss"
+url = "https://blogs.nvidia.com/feed/"
+homepage = "https://blogs.nvidia.com/"
+description = "NVIDIA news on AI, GPUs, robotics"
+domains = ["ai", "robotics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+general = true
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "AWS Machine Learning Blog"
+kind = "rss"
+url = "https://aws.amazon.com/blogs/machine-learning/feed/"
+homepage = "https://aws.amazon.com/"
+description = "AWS ML how-tos and announcements"
+domains = ["ai"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 67 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Interconnects"
+kind = "rss"
+url = "https://www.interconnects.ai/feed"
+homepage = "https://www.interconnects.ai/"
+description = "Nathan Lambert on open models and RLHF"
+domains = ["ai"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Google Research Blog"
+kind = "rss"
+url = "https://research.google/blog/rss/"
+homepage = "https://research.google/"
+description = "Google Research papers and results"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Mistral AI News"
+kind = "rss"
+url = "https://mistral.ai/news/rss"
+homepage = "https://mistral.ai/"
+description = "Official Mistral AI announcements"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Apple Machine Learning Research"
+kind = "rss"
+url = "https://machinelearning.apple.com/rss.xml"
+homepage = "https://machinelearning.apple.com/"
+description = "Apple ML research highlights and papers"
+domains = ["ai"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Cloudflare Blog"
+kind = "rss"
+url = "https://blog.cloudflare.com/rss/"
+homepage = "https://blog.cloudflare.com/"
+description = "Cloudflare engineering and internet-infrastructure posts"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Netflix Tech Blog"
+kind = "rss"
+url = "https://netflixtechblog.com/feed"
+homepage = "https://netflixtechblog.com/"
+description = "Netflix engineering deep dives"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Martin Fowler"
+kind = "rss"
+url = "https://martinfowler.com/feed.atom"
+homepage = "https://martinfowler.com/"
+description = "Software design and architecture essays"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Julia Evans"
+kind = "rss"
+url = "https://jvns.ca/atom.xml"
+homepage = "https://jvns.ca/"
+description = "Approachable systems and tooling explainers"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Rust Blog"
+kind = "rss"
+url = "https://blog.rust-lang.org/feed.xml"
+homepage = "https://blog.rust-lang.org/"
+description = "Official Rust language announcements"
+domains = ["software"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Go Blog"
+kind = "rss"
+url = "https://go.dev/blog/feed.atom"
+homepage = "https://go.dev/"
+description = "Official Go team blog"
+domains = ["software"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "LWN.net Headlines"
+kind = "rss"
+url = "https://lwn.net/headlines/rss"
+homepage = "https://lwn.net/"
+description = "Linux and free-software news headlines"
+domains = ["software", "cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 120
+general = true
+
+[[source]]
+name = "Stack Overflow Blog"
+kind = "rss"
+url = "https://stackoverflow.blog/feed/"
+homepage = "https://stackoverflow.blog/"
+description = "Developer community and industry posts"
+domains = ["software", "ai"]
+tier = "optional"
+trust = 0.6
+interval = 240
+general = true
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "GitHub Blog"
+kind = "rss"
+url = "https://github.blog/feed/"
+homepage = "https://github.blog/"
+description = "GitHub product and developer news"
+domains = ["software", "ai"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "Lobsters"
+kind = "rss"
+url = "https://lobste.rs/rss"
+homepage = "https://lobste.rs/"
+description = "Community-curated programming links"
+domains = ["software", "cybersecurity"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 84 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "The Pragmatic Engineer"
+kind = "rss"
+url = "https://newsletter.pragmaticengineer.com/feed"
+homepage = "https://newsletter.pragmaticengineer.com/"
+description = "Gergely Orosz on engineering careers and big tech"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "InfoQ"
+kind = "rss"
+url = "https://feed.infoq.com/"
+homepage = "https://feed.infoq.com/"
+description = "Software architecture and development news"
+domains = ["software", "ai"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Meta Engineering Blog"
+kind = "rss"
+url = "https://engineering.fb.com/feed/"
+homepage = "https://engineering.fb.com/"
+description = "Engineering posts from Meta"
+domains = ["software"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Python Insider"
+kind = "rss"
+url = "https://blog.python.org/feeds/posts/default"
+homepage = "https://blog.python.org/"
+description = "Official Python release and core-dev news"
+domains = ["software"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Quanta Magazine"
+kind = "rss"
+url = "https://www.quantamagazine.org/feed/"
+homepage = "https://www.quantamagazine.org/"
+description = "Mathematics, physics and CS feature journalism"
+domains = ["mathematics", "physics", "science-tech"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "Terence Tao's Blog"
+kind = "rss"
+url = "https://terrytao.wordpress.com/feed/"
+homepage = "https://terrytao.wordpress.com/"
+description = "Research-level math posts by Terence Tao"
+domains = ["mathematics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Azimuth (John Baez)"
+kind = "rss"
+url = "https://johncarlosbaez.wordpress.com/feed/"
+homepage = "https://johncarlosbaez.wordpress.com/"
+description = "Math, physics and sustainability essays"
+domains = ["mathematics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Gowers's Weblog"
+kind = "rss"
+url = "https://gowers.wordpress.com/feed/"
+homepage = "https://gowers.wordpress.com/"
+description = "Tim Gowers on mathematics"
+domains = ["mathematics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Xena Project"
+kind = "rss"
+url = "https://xenaproject.wordpress.com/feed/"
+homepage = "https://xenaproject.wordpress.com/"
+description = "Lean theorem prover and formalising mathematics"
+domains = ["mathematics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Mathbabe"
+kind = "rss"
+url = "https://mathbabe.org/feed/"
+homepage = "https://mathbabe.org/"
+description = "Cathy ONeil on math, data science and society"
+domains = ["mathematics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Combinatorics and more (Gil Kalai)"
+kind = "rss"
+url = "https://gilkalai.wordpress.com/feed/"
+homepage = "https://gilkalai.wordpress.com/"
+description = "Research-level combinatorics and geometry blog"
+domains = ["mathematics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Physics World"
+kind = "rss"
+url = "https://physicsworld.com/feed/"
+homepage = "https://physicsworld.com/"
+description = "IOP physics news and features"
+domains = ["physics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Preposterous Universe (Sean Carroll)"
+kind = "rss"
+url = "https://preposterousuniverse.com/feed/"
+homepage = "https://preposterousuniverse.com/"
+description = "Physics and cosmology blog"
+domains = ["physics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Phys.org Physics News"
+kind = "rss"
+url = "https://phys.org/rss-feed/physics-news/"
+homepage = "https://phys.org/"
+description = "Press-release based physics news"
+domains = ["physics"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 60 posts a week."
+
+[[source]]
+name = "Shtetl-Optimized"
+kind = "rss"
+url = "https://scottaaronson.blog/?feed=rss2"
+homepage = "https://scottaaronson.blog/"
+description = "Scott Aaronson on quantum computing and complexity"
+domains = ["physics", "ai", "mathematics"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "Backreaction"
+kind = "rss"
+url = "https://backreaction.blogspot.com/feeds/posts/default"
+homepage = "https://backreaction.blogspot.com/"
+description = "Sabine Hossenfelder on physics"
+domains = ["physics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Nature Physics TOC"
+kind = "rss"
+url = "https://www.nature.com/nphys.rss"
+homepage = "https://www.nature.com/"
+description = "Table of contents for Nature Physics"
+domains = ["physics"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Not Even Wrong"
+kind = "rss"
+url = "https://www.math.columbia.edu/~woit/wordpress/?feed=rss2"
+homepage = "https://www.math.columbia.edu/"
+description = "Peter Woit on math and theoretical physics"
+domains = ["physics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "APS Physics Magazine"
+kind = "rss"
+url = "https://feeds.aps.org/rss/recent/physics.xml"
+homepage = "https://feeds.aps.org/"
+description = "Research highlights from the American Physical Society"
+domains = ["physics"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "CERN Courier"
+kind = "rss"
+url = "https://cerncourier.com/feed/"
+homepage = "https://cerncourier.com/"
+description = "Particle physics and accelerator news"
+domains = ["physics"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Quantum Frontiers"
+kind = "rss"
+url = "https://quantumfrontiers.com/feed/"
+homepage = "https://quantumfrontiers.com/"
+description = "Caltech IQIM quantum information blog"
+domains = ["physics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Physical Review Letters (recent)"
+kind = "rss"
+url = "https://feeds.aps.org/rss/recent/prl.xml"
+homepage = "https://feeds.aps.org/"
+description = "Latest PRL article listings"
+domains = ["physics"]
+tier = "optional"
+trust = 0.85
+interval = 120
+reason = "High volume: about 50 posts a week."
+
+[[source]]
+name = "IEEE Spectrum: Robotics"
+kind = "rss"
+url = "https://spectrum.ieee.org/feeds/topic/robotics.rss"
+homepage = "https://spectrum.ieee.org/"
+description = "Robotics news and features"
+domains = ["robotics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "The Robot Report"
+kind = "rss"
+url = "https://www.therobotreport.com/feed/"
+homepage = "https://www.therobotreport.com/"
+description = "Commercial robotics industry news"
+domains = ["robotics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Robohub"
+kind = "rss"
+url = "https://robohub.org/feed/"
+homepage = "https://robohub.org/"
+description = "Robotics research and community news"
+domains = ["robotics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Science Robotics TOC"
+kind = "rss"
+url = "https://www.science.org/action/showFeed?type=etoc&feed=rss&jc=scirobotics"
+homepage = "https://www.science.org/"
+description = "Science Robotics latest issue table of contents"
+domains = ["robotics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "ROS Discourse"
+kind = "rss"
+url = "https://discourse.openrobotics.org/latest.rss"
+homepage = "https://discourse.openrobotics.org/"
+description = "Open Robotics community forum latest topics"
+domains = ["robotics"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Jane Street Blog"
+kind = "rss"
+url = "https://blog.janestreet.com/feed.xml"
+homepage = "https://blog.janestreet.com/"
+description = "Technical posts from Jane Street (OCaml, trading systems)"
+domains = ["quant-finance"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "CNBC Finance"
+kind = "rss"
+url = "https://www.cnbc.com/id/20910258/device/rss/rss.html"
+homepage = "https://www.cnbc.com/"
+description = "CNBC finance headlines"
+domains = ["quant-finance"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "MarketWatch Top Stories"
+kind = "rss"
+url = "https://feeds.content.dowjones.io/public/rss/mw_topstories"
+homepage = "https://feeds.content.dowjones.io/"
+description = "Market news headlines"
+domains = ["quant-finance"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 225 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Federal Reserve Press Releases"
+kind = "rss"
+url = "https://www.federalreserve.gov/feeds/press_all.xml"
+homepage = "https://www.federalreserve.gov/"
+description = "Official Fed press releases"
+domains = ["quant-finance"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "Alpha Architect"
+kind = "rss"
+url = "https://alphaarchitect.com/feed/"
+homepage = "https://alphaarchitect.com/"
+description = "Quantitative investing research blog"
+domains = ["quant-finance"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Quantocracy"
+kind = "rss"
+url = "http://feeds.feedburner.com/Quantocracy"
+homepage = "http://feeds.feedburner.com/"
+description = "Aggregator of quant finance blogs"
+domains = ["quant-finance"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Two Sigma Insights"
+kind = "rss"
+url = "https://www.twosigma.com/articles/feed/"
+homepage = "https://www.twosigma.com/"
+description = "Articles from Two Sigma"
+domains = ["quant-finance"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Federal Reserve Speeches"
+kind = "rss"
+url = "https://www.federalreserve.gov/feeds/speeches.xml"
+homepage = "https://www.federalreserve.gov/"
+description = "Fed official speeches and testimony"
+domains = ["quant-finance"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "SEC Press Releases"
+kind = "rss"
+url = "https://www.sec.gov/news/pressreleases.rss"
+homepage = "https://www.sec.gov/"
+description = "US SEC press releases"
+domains = ["quant-finance"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "The Economist: Finance & Economics"
+kind = "rss"
+url = "https://www.economist.com/finance-and-economics/rss.xml"
+homepage = "https://www.economist.com/"
+description = "Section headlines"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Marginal Revolution"
+kind = "rss"
+url = "https://marginalrevolution.com/feed"
+homepage = "https://marginalrevolution.com/"
+description = "Cowen and Tabarrok economics blog"
+domains = ["economics", "ai"]
+tier = "core"
+trust = 0.75
+interval = 120
+general = true
+
+[[source]]
+name = "VoxEU / CEPR"
+kind = "rss"
+url = "https://cepr.org/rss/vox-content"
+homepage = "https://cepr.org/"
+description = "Economist-written policy columns"
+domains = ["economics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Mint: Economy"
+kind = "rss"
+url = "https://www.livemint.com/rss/economy"
+homepage = "https://www.livemint.com/"
+description = "Indian economy news"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Economic Times Top Stories"
+kind = "rss"
+url = "https://economictimes.indiatimes.com/rssfeedstopstories.cms"
+homepage = "https://economictimes.indiatimes.com/"
+description = "Indian business headlines"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "BBC News: Business"
+kind = "rss"
+url = "https://feeds.bbci.co.uk/news/business/rss.xml"
+homepage = "https://feeds.bbci.co.uk/"
+description = "BBC business news"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Project Syndicate"
+kind = "rss"
+url = "https://www.project-syndicate.org/rss"
+homepage = "https://www.project-syndicate.org/"
+description = "Op-eds by economists and policymakers"
+domains = ["economics"]
+tier = "core"
+trust = 0.75
+interval = 120
+
+[[source]]
+name = "Liberty Street Economics (NY Fed)"
+kind = "rss"
+url = "https://libertystreeteconomics.newyorkfed.org/feed/"
+homepage = "https://libertystreeteconomics.newyorkfed.org/"
+description = "NY Fed research blog"
+domains = ["economics"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Noahpinion"
+kind = "rss"
+url = "https://www.noahpinion.blog/feed"
+homepage = "https://www.noahpinion.blog/"
+description = "Noah Smith on economics"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "EconLib"
+kind = "rss"
+url = "https://www.econlib.org/feed/"
+homepage = "https://www.econlib.org/"
+description = "Liberty Fund economics essays"
+domains = ["economics"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "ECB Press Releases"
+kind = "rss"
+url = "https://www.ecb.europa.eu/rss/press.html"
+homepage = "https://www.ecb.europa.eu/"
+description = "European Central Bank press"
+domains = ["economics"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Bank of England News"
+kind = "rss"
+url = "https://www.bankofengland.co.uk/rss/news"
+homepage = "https://www.bankofengland.co.uk/"
+description = "Bank of England news and publications"
+domains = ["economics"]
+tier = "optional"
+trust = 0.85
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Foreign Policy"
+kind = "rss"
+url = "https://foreignpolicy.com/feed/"
+homepage = "https://foreignpolicy.com/"
+description = "Global affairs reporting and analysis"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.75
+interval = 120
+config = { max_items = 30 }
+
+[[source]]
+name = "Al Jazeera (all)"
+kind = "rss"
+url = "https://www.aljazeera.com/xml/rss/all.xml"
+homepage = "https://www.aljazeera.com/"
+description = "Global news headlines"
+domains = ["geopolitics"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 533 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "War on the Rocks"
+kind = "rss"
+url = "https://warontherocks.com/feed/"
+homepage = "https://warontherocks.com/"
+description = "Defense and security analysis"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "The Diplomat"
+kind = "rss"
+url = "https://thediplomat.com/feed/"
+homepage = "https://thediplomat.com/"
+description = "Asia-Pacific politics and security"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.75
+interval = 120
+config = { max_items = 30 }
+
+[[source]]
+name = "International Crisis Group"
+kind = "rss"
+url = "https://www.crisisgroup.org/rss.xml"
+homepage = "https://www.crisisgroup.org/"
+description = "Conflict analysis and reports"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "BBC News: World"
+kind = "rss"
+url = "https://feeds.bbci.co.uk/news/world/rss.xml"
+homepage = "https://feeds.bbci.co.uk/"
+description = "BBC world news"
+domains = ["geopolitics"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 80 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Foreign Affairs"
+kind = "rss"
+url = "https://www.foreignaffairs.com/rss.xml"
+homepage = "https://www.foreignaffairs.com/"
+description = "Foreign policy journal"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "The Hindu: International"
+kind = "rss"
+url = "https://www.thehindu.com/news/international/feeder/default.rss"
+homepage = "https://www.thehindu.com/"
+description = "International news by an Indian daily"
+domains = ["geopolitics"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 236 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "RAND New Publications"
+kind = "rss"
+url = "https://www.rand.org/pubs/new.xml"
+homepage = "https://www.rand.org/"
+description = "RAND research publications"
+domains = ["geopolitics"]
+tier = "core"
+trust = 0.85
+interval = 240
+
+[[source]]
+name = "TechCrunch"
+kind = "rss"
+url = "https://techcrunch.com/feed/"
+homepage = "https://techcrunch.com/"
+description = "Startup and tech news"
+domains = ["startups", "ai", "science-tech"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 90 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Y Combinator Blog"
+kind = "rss"
+url = "https://www.ycombinator.com/blog/rss/"
+homepage = "https://www.ycombinator.com/"
+description = "Official YC announcements and essays"
+domains = ["startups"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Crunchbase News"
+kind = "rss"
+url = "https://news.crunchbase.com/feed/"
+homepage = "https://news.crunchbase.com/"
+description = "Funding and startup data journalism"
+domains = ["startups"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Inc42"
+kind = "rss"
+url = "https://inc42.com/feed/"
+homepage = "https://inc42.com/"
+description = "Indian startup news"
+domains = ["startups"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 79 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "YourStory"
+kind = "rss"
+url = "https://yourstory.com/feed"
+homepage = "https://yourstory.com/"
+description = "Indian startup stories"
+domains = ["startups"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 63 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "The Verge"
+kind = "rss"
+url = "https://www.theverge.com/rss/index.xml"
+homepage = "https://www.theverge.com/"
+description = "Consumer tech news"
+domains = ["science-tech", "startups"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 76 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Stratechery"
+kind = "rss"
+url = "https://stratechery.com/feed/"
+homepage = "https://stratechery.com/"
+description = "Ben Thompson tech strategy analysis"
+domains = ["startups", "ai"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "a16z (a16z.news)"
+kind = "rss"
+url = "https://www.a16z.news/feed"
+homepage = "https://www.a16z.news/"
+description = "Andreessen Horowitz newsletter"
+domains = ["startups"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Science (AAAS) News"
+kind = "rss"
+url = "https://www.science.org/rss/news_current.xml"
+homepage = "https://www.science.org/"
+description = "Science magazine news"
+domains = ["science-tech"]
+tier = "core"
+trust = 0.85
+interval = 240
+general = true
+
+[[source]]
+name = "MIT Technology Review"
+kind = "rss"
+url = "https://www.technologyreview.com/feed/"
+homepage = "https://www.technologyreview.com/"
+description = "Technology journalism"
+domains = ["science-tech", "ai"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "Ars Technica"
+kind = "rss"
+url = "https://feeds.arstechnica.com/arstechnica/index"
+homepage = "https://feeds.arstechnica.com/"
+description = "Tech and science news"
+domains = ["science-tech", "software", "space"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 60 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "New Scientist"
+kind = "rss"
+url = "https://www.newscientist.com/feed/"
+homepage = "https://www.newscientist.com/"
+description = "Science news"
+domains = ["science-tech", "physics", "space"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 41 posts a week."
+
+[[source]]
+name = "The Conversation (global)"
+kind = "rss"
+url = "https://theconversation.com/global/articles.atom"
+homepage = "https://theconversation.com/"
+description = "Academic-authored explainers"
+domains = ["science-tech", "economics", "geopolitics"]
+tier = "core"
+trust = 0.75
+interval = 240
+general = true
+
+[[source]]
+name = "IEEE Spectrum"
+kind = "rss"
+url = "https://spectrum.ieee.org/feeds/feed.rss"
+homepage = "https://spectrum.ieee.org/"
+description = "Engineering and technology news"
+domains = ["science-tech", "robotics", "ai"]
+tier = "core"
+trust = 0.75
+interval = 720
+general = true
+
+[[source]]
+name = "WIRED Science"
+kind = "rss"
+url = "https://www.wired.com/feed/category/science/latest/rss"
+homepage = "https://www.wired.com/"
+description = "Science coverage from WIRED"
+domains = ["science-tech"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Nature (journal)"
+kind = "rss"
+url = "https://www.nature.com/nature.rss"
+homepage = "https://www.nature.com/"
+description = "Latest Nature papers"
+domains = ["science-tech", "physics"]
+tier = "optional"
+trust = 0.85
+interval = 120
+general = true
+reason = "High volume: about 173 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "Scientific American"
+kind = "rss"
+url = "https://www.scientificamerican.com/platform/syndication/rss/"
+homepage = "https://www.scientificamerican.com/"
+description = "Science news and features"
+domains = ["science-tech", "physics", "space"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "ScienceDaily Top Science"
+kind = "rss"
+url = "https://www.sciencedaily.com/rss/top/science.xml"
+homepage = "https://www.sciencedaily.com/"
+description = "University press-release science news"
+domains = ["science-tech"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 45 posts a week."
+
+[[source]]
+name = "Opportunity Desk"
+kind = "rss"
+url = "https://opportunitydesk.org/feed/"
+homepage = "https://opportunitydesk.org/"
+description = "Fellowships, internships, scholarships listings"
+domains = ["research-opportunities"]
+tier = "optional"
+trust = 0.6
+interval = 120
+purpose = "opportunities"
+reason = "An opportunities listing. Left off until you decide how wide the opportunities search should be."
+config = { max_items = 30 }
+
+[[source]]
+name = "Mitacs"
+kind = "rss"
+url = "https://www.mitacs.ca/feed/"
+homepage = "https://www.mitacs.ca/"
+description = "Canadian research internship programmes (Globalink)"
+domains = ["research-opportunities"]
+tier = "optional"
+trust = 0.75
+interval = 720
+purpose = "opportunities"
+reason = "An opportunities listing. Left off until you decide how wide the opportunities search should be."
+
+[[source]]
+name = "Google Open Source Blog"
+kind = "rss"
+url = "https://opensource.googleblog.com/feeds/posts/default"
+homepage = "https://opensource.googleblog.com/"
+description = "Open source news incl. Summer of Code"
+domains = ["research-opportunities"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Scholars4Dev"
+kind = "rss"
+url = "https://www.scholars4dev.com/feed/"
+homepage = "https://www.scholars4dev.com/"
+description = "Scholarship listings"
+domains = ["research-opportunities"]
+tier = "optional"
+trust = 0.6
+interval = 120
+purpose = "opportunities"
+reason = "An opportunities listing. Left off until you decide how wide the opportunities search should be."
+config = { max_items = 30 }
+
+[[source]]
+name = "Opportunities for Africans"
+kind = "rss"
+url = "https://www.opportunitiesforafricans.com/feed/"
+homepage = "https://www.opportunitiesforafricans.com/"
+description = "Scholarship/fellowship listings"
+domains = ["research-opportunities"]
+tier = "optional"
+trust = 0.6
+interval = 120
+purpose = "opportunities"
+reason = "An opportunities listing. Left off until you decide how wide the opportunities search should be."
+
+[[source]]
+name = "Opportunity Desk: Internships"
+kind = "rss"
+url = "https://opportunitydesk.org/category/internships/feed/"
+homepage = "https://opportunitydesk.org/"
+description = "Internship listings"
+domains = ["research-opportunities"]
+tier = "optional"
+trust = 0.6
+interval = 240
+purpose = "opportunities"
+reason = "An opportunities listing. Left off until you decide how wide the opportunities search should be."
+
+[[source]]
+name = "Major League Hacking Blog"
+kind = "rss"
+url = "https://blog.mlh.com/feed"
+homepage = "https://blog.mlh.com/"
+description = "MLH news and hackathon season updates"
+domains = ["hackathons"]
+tier = "optional"
+trust = 0.6
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Schneier on Security"
+kind = "rss"
+url = "https://www.schneier.com/feed/atom/"
+homepage = "https://www.schneier.com/"
+description = "Bruce Schneier security commentary"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "The Hacker News"
+kind = "rss"
+url = "https://feeds.feedburner.com/TheHackersNews"
+homepage = "https://feeds.feedburner.com/"
+description = "Security news"
+domains = ["cybersecurity"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 69 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "BleepingComputer"
+kind = "rss"
+url = "https://www.bleepingcomputer.com/feed/"
+homepage = "https://www.bleepingcomputer.com/"
+description = "Security and tech news"
+domains = ["cybersecurity"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 51 posts a week."
+
+[[source]]
+name = "Dark Reading"
+kind = "rss"
+url = "https://www.darkreading.com/rss.xml"
+homepage = "https://www.darkreading.com/"
+description = "Enterprise security news"
+domains = ["cybersecurity"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Trail of Bits Blog"
+kind = "rss"
+url = "https://blog.trailofbits.com/index.xml"
+homepage = "https://blog.trailofbits.com/"
+description = "Security research and tooling"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Google Project Zero"
+kind = "rss"
+url = "https://projectzero.google/feed.xml"
+homepage = "https://projectzero.google/"
+description = "Vulnerability research"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Phoronix"
+kind = "rss"
+url = "https://www.phoronix.com/rss.php"
+homepage = "https://www.phoronix.com/"
+description = "Linux hardware/software news"
+domains = ["software", "cybersecurity"]
+tier = "optional"
+trust = 0.6
+interval = 120
+general = true
+reason = "High volume: about 57 posts a week."
+
+[[source]]
+name = "Troy Hunt"
+kind = "rss"
+url = "https://www.troyhunt.com/rss/"
+homepage = "https://www.troyhunt.com/"
+description = "Security and data-breach commentary"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "Krebs on Security"
+kind = "rss"
+url = "https://krebsonsecurity.com/feed/"
+homepage = "https://krebsonsecurity.com/"
+description = "Investigative security journalism"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 720
+
+[[source]]
+name = "SANS Internet Storm Center"
+kind = "rss"
+url = "https://isc.sans.edu/rssfeed.xml"
+homepage = "https://isc.sans.edu/"
+description = "Daily handler diaries"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Cisco Talos Blog"
+kind = "rss"
+url = "https://blog.talosintelligence.com/rss/"
+homepage = "https://blog.talosintelligence.com/"
+description = "Threat intelligence research"
+domains = ["cybersecurity"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "NASA News"
+kind = "rss"
+url = "https://www.nasa.gov/feed/"
+homepage = "https://www.nasa.gov/"
+description = "NASA news items"
+domains = ["space"]
+tier = "core"
+trust = 0.85
+interval = 120
+
+[[source]]
+name = "SpaceNews"
+kind = "rss"
+url = "https://spacenews.com/feed/"
+homepage = "https://spacenews.com/"
+description = "Space industry news"
+domains = ["space"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Space.com"
+kind = "rss"
+url = "https://www.space.com/feeds.xml"
+homepage = "https://www.space.com/"
+description = "Space news"
+domains = ["space"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "High volume: about 75 posts a week."
+config = { max_items = 30 }
+
+[[source]]
+name = "ESO News"
+kind = "rss"
+url = "https://www.eso.org/public/news/feed/"
+homepage = "https://www.eso.org/"
+description = "European Southern Observatory press releases"
+domains = ["space"]
+tier = "core"
+trust = 0.85
+interval = 720
+
+[[source]]
+name = "Planetary Society"
+kind = "rss"
+url = "https://www.planetary.org/rss/articles"
+homepage = "https://www.planetary.org/"
+description = "Planetary science and exploration articles"
+domains = ["space"]
+tier = "core"
+trust = 0.75
+interval = 240
+
+[[source]]
+name = "Universe Today"
+kind = "rss"
+url = "https://www.universetoday.com/rss.xml"
+homepage = "https://www.universetoday.com/"
+description = "Astronomy news"
+domains = ["space"]
+tier = "optional"
+trust = 0.6
+interval = 120
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Astronomy Picture of the Day (apod.com mirror)"
+kind = "rss"
+url = "https://apod.com/feed.rss"
+homepage = "https://apod.com/"
+description = "Daily astronomy image with explanation"
+domains = ["space"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "Sky & Telescope News"
+kind = "rss"
+url = "https://skyandtelescope.org/astronomy-news/feed/"
+homepage = "https://skyandtelescope.org/"
+description = "Astronomy news"
+domains = ["space"]
+tier = "optional"
+trust = 0.6
+interval = 240
+reason = "From PIA's vetted catalogue; matches one of your spaces."
+
+[[source]]
+name = "ESA/Webb News"
+kind = "rss"
+url = "https://esawebb.org/news/feed/"
+homepage = "https://esawebb.org/"
+description = "James Webb Space Telescope news"
+domains = ["space"]
+tier = "optional"
+trust = 0.85
+interval = 720
+reason = "From PIA's vetted catalogue; matches one of your spaces."

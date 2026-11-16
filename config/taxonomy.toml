@@ -1,0 +1,346 @@
+# The information spaces PIA starts with, and the vocabulary used to sort items into them WITHOUT a model.
+#
+# This file only SEEDS the database (on first run, and when new entries are added here later). After that the
+# database is the source of truth: domains and topics can be added, renamed, weighted or muted in the app.
+#
+#   keywords  phrases that suggest an item belongs to the domain (whole-word match, case-insensitive).
+#             A hit in the title counts more than a hit in the text.
+#   arxiv     arXiv category prefixes that map to the domain.
+#   topics    seed topics, written "Name | alias | alias". Names and aliases are matched as whole phrases.
+#
+# Personal details (which university, which topics matter most) do NOT belong here; see config/personal.example.toml.
+
+[[domain]]
+slug = "ai"
+name = "Artificial Intelligence & Machine Learning"
+short = "AI"
+hue = 268
+description = "Models, research, agents, evaluation and the engineering of AI systems."
+arxiv = ["cs.AI", "cs.LG", "cs.CL", "cs.CV", "cs.MA", "cs.NE", "cs.IR", "stat.ML"]
+keywords = ["llm", "llms", "large language model", "language model", "machine learning", "deep learning", "neural network", "transformer", "diffusion model", "fine-tuning", "finetuning", "inference", "gpt", "claude", "gemini", "llama", "mistral", "openai", "anthropic", "deepmind", "hugging face", "agentic", "ai agent", "ai agents", "reinforcement learning", "rag", "embedding", "embeddings", "multimodal", "foundation model", "generative ai", "artificial intelligence", "benchmark", "alignment", "interpretability", "prompt", "tokenizer", "open-weight", "open weights"]
+topics = [
+  "AI agents | agentic | agent architecture | agent architectures | multi-agent",
+  "Large language models | LLM | LLMs | language model | language models",
+  "Model releases | model release | open-weight | open weights | new frontier model",
+  "Model evaluation & benchmarks | eval | evals | benchmark | benchmarks",
+  "Reasoning in models | chain-of-thought | reasoning model | reasoning models",
+  "Retrieval-augmented generation | RAG | retrieval augmented | vector database",
+  "Local inference | local model | local models | quantization | gguf | on-device",
+  "Open-source AI | open source model | open-source model",
+  "AI-assisted coding | coding agent | coding agents | code generation | copilot",
+  "Interpretability | mechanistic interpretability | sparse autoencoder",
+  "AI safety & alignment | alignment | ai safety | jailbreak",
+  "Diffusion & generative media | diffusion model | text-to-image | text-to-video",
+  "Reinforcement learning | RL | policy gradient",
+  "Computer vision | object detection | image segmentation | vision transformer",
+  "Training & optimisation | fine-tuning | finetuning | distillation | LoRA",
+  "AI infrastructure | inference engine | gpu cluster | model serving",
+]
+
+[[domain]]
+slug = "software"
+name = "Computer Science & Software Engineering"
+short = "Software"
+hue = 218
+description = "Systems, languages, tools, architecture and the craft of building software."
+arxiv = ["cs.SE", "cs.PL", "cs.DS", "cs.DB", "cs.DC", "cs.CC", "cs.LO", "cs.PF"]
+keywords = ["programming", "compiler", "database", "postgres", "sqlite", "kubernetes", "docker", "rust", "python", "c++", "golang", "typescript", "javascript", "linux", "kernel", "open source", "open-source", "framework", "library", "api", "backend", "frontend", "distributed system", "distributed systems", "algorithm", "algorithms", "data structure", "debugging", "refactoring", "devops", "git", "github", "performance", "latency", "concurrency", "wasm", "webassembly", "sdk", "cli", "runtime", "release notes"]
+topics = [
+  "Systems design | system design | software architecture",
+  "Distributed systems | distributed system | consensus algorithm | raft consensus | paxos",
+  "Databases | database | postgres | postgresql | sqlite | query engine",
+  "Programming languages | compiler | type system | language design",
+  "C++ | cpp",
+  "Python | cpython",
+  "Rust | rustlang",
+  "Algorithms & data structures | data structure | data structures | algorithm design | approximation algorithm | approximation algorithms | graph algorithm | graph algorithms | polynomial time | time complexity | dynamic programming | competitive programming",
+  "Developer tools | developer tooling | devtools | debugger | language server",
+  "Performance engineering | performance optimization | profiling | low latency",
+  "Backend engineering | backend | microservices | api design",
+  "Operating systems | operating system | linux kernel | os kernel",
+  "Open-source projects | open source project | open-source project",
+  "Testing & reliability | software testing | fuzzing | formal verification | observability",
+  "Web platform | webassembly | wasm | browser engine",
+]
+
+[[domain]]
+slug = "mathematics"
+name = "Mathematics"
+short = "Maths"
+hue = 38
+description = "Results, proofs, exposition and the connections between areas of mathematics."
+arxiv = ["math."]
+keywords = ["mathematics", "mathematician", "mathematicians", "theorem", "proof", "conjecture", "lemma", "topology", "algebra", "geometry", "number theory", "combinatorics", "analysis", "manifold", "prime", "primes", "group theory", "category theory", "graph theory", "probability", "fields medal", "abel prize", "riemann", "langlands", "lean prover", "formal proof", "equation", "calculus", "linear algebra"]
+topics = [
+  "Number theory | prime numbers | primes | riemann hypothesis | langlands",
+  "Combinatorics | graph theory | ramsey | extremal combinatorics",
+  "Algebra | group theory | representation theory | commutative algebra",
+  "Geometry & topology | topology | manifold | manifolds | differential geometry | algebraic geometry",
+  "Mathematical analysis | functional analysis | harmonic analysis | PDE | partial differential equations",
+  "Probability & statistics | probability theory | stochastic process | stochastic processes",
+  "Linear algebra | matrix theory | random matrices",
+  "Formalised mathematics | lean prover | lean 4 | mathlib | proof assistant | formal proof",
+  "AI for mathematics | automated theorem proving | autoformalization | alphaproof",
+  "Mathematical physics | integrable systems | quantum field theory",
+  "Logic & foundations | set theory | model theory | computability",
+  "Optimisation | convex optimization | optimal transport",
+  "Category theory | higher category | topos",
+  "Prizes & proofs | fields medal | abel prize | millennium prize | long-standing conjecture | settles a conjecture | resolves a conjecture",
+]
+
+[[domain]]
+slug = "physics"
+name = "Physics & Theoretical Physics"
+short = "Physics"
+hue = 188
+description = "Fundamental physics, theory and the experiments that test it."
+arxiv = ["hep-th", "hep-ph", "hep-ex", "hep-lat", "gr-qc", "quant-ph", "cond-mat", "physics.", "nucl-", "math-ph"]
+keywords = ["physics", "physicist", "physicists", "quantum", "relativity", "particle", "particles", "collider", "lhc", "cern", "higgs", "neutrino", "dark matter", "dark energy", "string theory", "quantum gravity", "black hole", "superconductor", "superconductivity", "condensed matter", "qubit", "quantum computing", "quantum computer", "entanglement", "photon", "electromagnetism", "thermodynamics", "standard model", "gravitational wave", "gravitational waves", "fusion"]
+topics = [
+  "Quantum mechanics | quantum theory | entanglement | quantum foundations",
+  "Quantum computing | quantum computer | qubit | qubits | quantum error correction",
+  "General relativity | relativity | gravitational waves | gravitational wave | spacetime",
+  "Quantum gravity | string theory | holography | loop quantum gravity",
+  "Particle physics | standard model | higgs | collider | LHC | neutrino",
+  "Quantum field theory | QFT | gauge theory | renormalization",
+  "Condensed matter | superconductivity | superconductor | topological matter",
+  "Electromagnetism | maxwell | electrodynamics",
+  "Statistical mechanics | thermodynamics | phase transition",
+  "Dark matter & dark energy | dark matter | dark energy",
+  "Nuclear fusion | fusion energy | tokamak | ignition",
+  "Black holes | black hole | hawking radiation | event horizon",
+]
+
+[[domain]]
+slug = "robotics"
+name = "Robotics & Autonomous Systems"
+short = "Robotics"
+hue = 148
+description = "Robots, embodied AI, autonomy and the engineering behind them."
+arxiv = ["cs.RO", "eess.SY"]
+keywords = ["robot", "robots", "robotics", "robotic", "humanoid", "humanoids", "autonomous vehicle", "autonomous vehicles", "self-driving", "drone", "drones", "manipulation", "locomotion", "quadruped", "embodied", "actuator", "slam", "motion planning", "boston dynamics", "figure ai", "unitree", "waymo", "teleoperation", "sim-to-real", "gripper", "exoskeleton"]
+topics = [
+  "Humanoid robots | humanoid | humanoids",
+  "Embodied AI | embodied intelligence | vision-language-action | VLA | robot foundation model",
+  "Robot manipulation | robotic manipulation | dexterous manipulation | gripper",
+  "Legged locomotion | quadruped | locomotion",
+  "Autonomous driving | self-driving | autonomous vehicle | autonomous vehicles | robotaxi",
+  "Drones & aerial robotics | drone | drones | UAV | quadcopter",
+  "Robot learning | imitation learning | sim-to-real | teleoperation",
+  "SLAM & navigation | SLAM | motion planning | path planning",
+  "Industrial & warehouse robotics | warehouse robot | industrial robot | cobot",
+  "Robot hardware | actuator | actuators | tactile sensor",
+]
+
+[[domain]]
+slug = "quant-finance"
+name = "Quantitative Finance & Markets"
+short = "Quant & Markets"
+hue = 100
+description = "Quantitative methods, market structure and what is moving markets."
+arxiv = ["q-fin."]
+keywords = ["quant", "quantitative finance", "hedge fund", "trading", "trader", "derivatives", "options", "volatility", "portfolio", "alpha", "market making", "market maker", "high-frequency", "stock market", "stocks", "equities", "bond", "bonds", "yield", "yields", "treasury", "nifty", "sensex", "s&p 500", "nasdaq", "interest rate", "interest rates", "central bank", "federal reserve", "rbi", "inflation", "risk model", "backtest", "factor investing", "arbitrage", "etf", "ipo", "earnings"]
+topics = [
+  "Quantitative trading | quant trading | algorithmic trading | systematic trading | backtest",
+  "Derivatives & options pricing | options pricing | black-scholes | volatility surface | financial derivatives",
+  "Market microstructure | market making | order book | high-frequency trading | HFT",
+  "Portfolio & risk | portfolio optimization | risk model | factor investing | value at risk",
+  "Machine learning in finance | ml for trading | financial machine learning",
+  "Stochastic calculus | stochastic volatility | stochastic differential equation | stochastic differential equations",
+  "Equity markets | stock market | equities | S&P 500 | nasdaq | nifty | sensex",
+  "Rates & central banks | interest rates | federal reserve | RBI | monetary policy",
+  "Quant firms | jane street | citadel | two sigma | renaissance technologies | hudson river trading",
+  "Crypto markets | bitcoin | ethereum | stablecoin",
+  "Fixed income & credit | bond market | treasury yields | credit spread",
+]
+
+[[domain]]
+slug = "economics"
+name = "Economics & Business"
+short = "Economics"
+hue = 68
+description = "The economy, policy, industries and the companies that shape them."
+arxiv = ["econ."]
+keywords = ["economy", "economic", "economics", "economist", "gdp", "inflation", "recession", "unemployment", "tariff", "tariffs", "trade", "fiscal", "monetary", "budget", "tax", "imf", "world bank", "growth", "productivity", "labour market", "labor market", "supply chain", "merger", "acquisition", "antitrust", "revenue", "profit", "layoffs", "industry", "consumer", "exports", "imports", "currency", "rupee", "dollar"]
+topics = [
+  "Macroeconomics | gdp growth | recession | inflation | unemployment",
+  "Monetary policy | interest rate decision | rate cut | rate hike",
+  "Trade & tariffs | tariffs | trade war | trade deal | export controls",
+  "Indian economy | india gdp | union budget | rupee | make in india",
+  "Technology industry | big tech | antitrust | chip industry | semiconductor industry",
+  "Labour markets | labor market | labour market | layoffs | wages",
+  "Development economics | poverty | world bank | development policy",
+  "Energy economics | oil prices | energy transition | opec",
+  "Corporate strategy | merger | mergers and acquisitions | earnings report",
+  "Economics research | working paper | nber | econometrics",
+]
+
+[[domain]]
+slug = "geopolitics"
+name = "Geopolitics & International Relations"
+short = "Geopolitics"
+hue = 8
+description = "States, conflicts, alliances and the forces between them."
+arxiv = []
+keywords = ["geopolitics", "geopolitical", "war", "conflict", "ceasefire", "sanctions", "diplomacy", "diplomatic", "treaty", "nato", "united nations", "security council", "foreign policy", "foreign minister", "prime minister", "president", "election", "elections", "military", "missile", "nuclear weapons", "border", "china", "russia", "ukraine", "taiwan", "iran", "israel", "gaza", "pakistan", "india", "european union", "brics", "g20", "summit", "coup", "invasion", "alliance", "indo-pacific"]
+topics = [
+  "US-China relations | us-china | taiwan strait | chip export controls",
+  "Russia-Ukraine war | ukraine war | russia ukraine",
+  "Middle East | israel | gaza | iran | saudi arabia",
+  "India's foreign policy | india-china | india-pakistan | indo-pacific | quad summit",
+  "Technology & geopolitics | semiconductor export | ai regulation | tech sovereignty | chip war",
+  "Nuclear & arms control | nuclear weapons | arms control | missile test",
+  "European Union | eu policy | brussels | european commission",
+  "Global institutions | united nations | nato | brics | g20 | wto",
+  "Elections & political change | election | elections | coup",
+  "Energy & resources | critical minerals | rare earths | energy security",
+  "South Asia | pakistan | bangladesh | sri lanka | nepal",
+]
+
+[[domain]]
+slug = "startups"
+name = "Startups, Entrepreneurship & Tech Companies"
+short = "Startups"
+hue = 342
+description = "New companies, funding, products and how technology businesses are built."
+arxiv = []
+keywords = ["startup", "startups", "founder", "founders", "venture capital", "vc", "funding round", "seed round", "series a", "series b", "raises", "raised", "valuation", "unicorn", "y combinator", "yc", "acquires", "acquired", "acquisition", "ipo", "product launch", "launches", "saas", "pivot", "accelerator", "incubator", "bootstrapped", "entrepreneur", "entrepreneurship", "product-market fit"]
+topics = [
+  "AI startups | ai startup | ai company",
+  "Funding rounds | funding round | seed round | series a | series b | valuation",
+  "Y Combinator | YC | demo day",
+  "Founder lessons | founder | founders | product-market fit | bootstrapped",
+  "Product launches | product launch",
+  "Developer-tool companies | devtools startup | developer platform",
+  "Indian startup ecosystem | indian startup | bengaluru startup | inc42",
+  "Acquisitions & IPOs | acquires | acquired by | ipo",
+  "Big tech strategy | big tech | google | microsoft | nvidia",
+  "Deep-tech startups | deep tech | hard tech | space startup | robotics startup",
+]
+
+[[domain]]
+slug = "science-tech"
+name = "General Science & Technology"
+short = "Science & Tech"
+hue = 245
+description = "Notable developments across science and technology beyond the other spaces."
+arxiv = ["q-bio.", "eess.", "nlin."]
+keywords = ["scientists", "researchers", "study", "discovery", "biology", "genetics", "genome", "crispr", "neuroscience", "brain", "climate", "energy", "battery", "batteries", "semiconductor", "chip", "chips", "materials", "chemistry", "medicine", "vaccine", "evolution", "nature journal", "science journal", "experiment", "breakthrough", "technology", "nobel prize"]
+topics = [
+  "Semiconductors & chips | semiconductor | chip fabrication | tsmc | lithography",
+  "Energy & batteries | battery | batteries | solar power | nuclear power | power grid",
+  "Biotechnology | crispr | gene editing | synthetic biology | protein design",
+  "Neuroscience | brain | neural recording | brain-computer interface",
+  "Climate science | climate change | emissions | carbon capture",
+  "Materials science | new material | metamaterial | superconducting material",
+  "Computing hardware | gpu | processor | quantum chip | neuromorphic",
+  "Scientific computing | numerical methods | supercomputer | high-performance computing",
+  "Nobel & major prizes | nobel prize | turing award | breakthrough prize",
+  "Medicine & health technology | drug discovery | clinical trial | medical imaging",
+]
+
+[[domain]]
+slug = "research-opportunities"
+name = "Research Opportunities & Internships"
+short = "Research & Internships"
+hue = 168
+description = "Research programmes, internships, fellowships and summer schools."
+opportunities = true
+arxiv = []
+keywords = ["internship", "internships", "intern", "fellowship", "fellowships", "summer school", "research programme", "research program", "research internship", "undergraduate research", "call for applications", "applications open", "apply now", "scholarship", "scholarships", "stipend", "summer research", "visiting student", "residency", "student researcher"]
+topics = [
+  "Research internships | research internship | summer research | undergraduate research | SURF | REU",
+  "Industry internships | software engineering intern | swe intern | summer intern",
+  "Fellowships | fellowship | fellowships | fellows program",
+  "Summer schools | summer school | winter school",
+  "AI residencies & student researcher roles | ai residency | student researcher | research residency",
+  "Scholarships | scholarship | scholarships",
+  "Open-source programmes | google summer of code | GSoC | outreachy | LFX mentorship",
+  "Quant internships | quant intern | trading intern | quantitative research intern",
+  "Opportunities for first-year students | first-year students | freshman | freshmen | first year undergraduate",
+]
+
+[[domain]]
+slug = "hackathons"
+name = "Hackathons, Competitions & Developer Programmes"
+short = "Hackathons & Competitions"
+hue = 308
+description = "Hackathons, programming and data contests, olympiad-style competitions and developer programmes."
+opportunities = true
+arxiv = []
+keywords = ["hackathon", "hackathons", "competition", "competitions", "contest", "contests", "challenge", "kaggle", "codeforces", "icpc", "leetcode", "codechef", "devpost", "mlh", "prize pool", "prizes", "bounty", "developer program", "developer programme", "student developer", "ambassador", "capture the flag", "ctf", "olympiad", "datathon"]
+topics = [
+  "Hackathons | hackathon | hackathons | MLH | devpost",
+  "Competitive programming | codeforces | ICPC | codechef | atcoder | leetcode contest",
+  "Machine-learning competitions | kaggle | datathon | ml competition",
+  "Quant & trading competitions | trading competition | quant challenge | jane street puzzle",
+  "Mathematics competitions | putnam | IMC | math olympiad | olympiad",
+  "Capture the flag | CTF | capture the flag",
+  "Developer programmes | developer program | developer programme | student ambassador | github campus expert",
+  "Open-source contribution programmes | hacktoberfest | google summer of code | GSoC",
+  "Robotics competitions | robocup | robotics challenge",
+  "Startup competitions | pitch competition | startup challenge",
+]
+
+[[domain]]
+slug = "university"
+name = "University Announcements & Opportunities"
+short = "University"
+hue = 25
+description = "Announcements, notices and opportunities from your institution."
+opportunities = true
+arxiv = []
+keywords = ["institute notice", "academic calendar", "convocation", "registration", "semester", "campus", "student council", "placement cell", "dean", "hostel", "technical fest", "cultural fest"]
+topics = [
+  "Academic notices | academic calendar | course registration | examination schedule",
+  "Campus opportunities | student project | campus internship | institute fellowship",
+  "Research at the institute | research group | lab opening | project position",
+  "Clubs & technical groups | technical society | student club | coding club",
+  "Events & talks | guest lecture | colloquium | seminar",
+  "Placements & internships cell | placement cell | campus placement | internship drive",
+  "Exchange & semester-abroad programmes | exchange programme | semester exchange | student exchange",
+]
+
+[[domain]]
+slug = "cybersecurity"
+name = "Cybersecurity & Computer Systems"
+short = "Security & Systems"
+hue = 358
+description = "Vulnerabilities, attacks, defences and the low-level systems they live in."
+arxiv = ["cs.CR", "cs.OS", "cs.AR", "cs.NI"]
+keywords = ["security", "vulnerability", "vulnerabilities", "exploit", "exploits", "malware", "ransomware", "zero-day", "0-day", "cve", "breach", "data breach", "phishing", "hacker", "hackers", "backdoor", "encryption", "cryptography", "authentication", "supply chain attack", "patch", "firewall", "botnet", "spyware", "rootkit", "memory safety", "sandbox", "privilege escalation", "threat actor", "kernel", "firmware", "cpu", "processor architecture"]
+topics = [
+  "Vulnerabilities & exploits | zero-day | CVE | exploits | vulnerability | vulnerabilities | remote code execution | RCE",
+  "Malware & ransomware | ransomware | malware | botnet | spyware",
+  "Supply-chain security | supply chain attack | dependency confusion | malicious package",
+  "AI security | prompt injection | model jailbreak | ai red team | llm security",
+  "Cryptography | post-quantum cryptography | encryption | zero-knowledge",
+  "Memory safety | memory-safe | use-after-free | buffer overflow",
+  "Breaches & incidents | data breach | breach | incident response",
+  "Operating-system internals | kernel exploit | linux security | windows internals",
+  "Computer architecture | cpu architecture | risc-v | side channel | speculative execution",
+  "Network security | DDoS | BGP | TLS",
+  "Nation-state activity | APT | threat actor | state-sponsored",
+]
+
+[[domain]]
+slug = "space"
+name = "Space, Astronomy & Astrophysics"
+short = "Space"
+hue = 288
+description = "Missions, launches, telescopes and what they tell us about the universe."
+arxiv = ["astro-ph"]
+keywords = ["space", "nasa", "esa", "isro", "spacex", "rocket", "launch", "satellite", "satellites", "orbit", "lunar", "moon", "mars", "telescope", "jwst", "james webb", "hubble", "galaxy", "galaxies", "exoplanet", "exoplanets", "astronomy", "astronomers", "astrophysics", "cosmology", "supernova", "asteroid", "comet", "starship", "spacecraft", "chandrayaan", "gaganyaan", "neutron star", "pulsar", "big bang", "cosmic"]
+topics = [
+  "Launch & rockets | starship | falcon 9 | rocket launch | reusable rocket",
+  "ISRO & Indian space programme | ISRO | chandrayaan | gaganyaan | aditya-l1",
+  "NASA missions | NASA | artemis | europa clipper",
+  "Space telescopes | JWST | james webb | hubble | euclid",
+  "Exoplanets | exoplanet | exoplanets | habitable zone | biosignature",
+  "Cosmology | big bang | cosmic microwave background | hubble tension | dark energy survey",
+  "Black holes & compact objects | neutron star | pulsar | supermassive black hole",
+  "Gravitational-wave astronomy | LIGO | gravitational wave detection",
+  "Planetary science | mars | moon | lunar | asteroid | comet",
+  "Satellites & orbital industry | starlink | satellite constellation | space debris",
+  "Galaxies & stars | galaxy formation | supernova | stellar evolution",
+]
