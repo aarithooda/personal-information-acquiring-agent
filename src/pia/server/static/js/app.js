@@ -4,7 +4,8 @@ import { api, setReachabilityHandler, setUnauthorisedHandler } from "./api.js";
 import { Feed } from "./legacy.js";
 import { Space, SpacesIndex, Topic } from "./feeds.js";
 import { ReaderSheet } from "./item.js";
-import { Interests, Notifications, Opportunities, Sources, System } from "./pages.js";
+import { Opportunities } from "./opportunities.js";
+import { Interests, Notifications, Sources, System } from "./pages.js";
 import { Empty, ErrorNote, Icon, IconButton, MarginNote, Meta, NotificationsDrawer, Palette, Row, RowActions, Shortcuts, Skeleton, Toasts, applyTheme, go, hueStyle, itemHref, loadSpaceTops, setReadingContext, toast, useItemActions, useItemSync, useLoad, useTriage } from "./ui.js";
 import { KIND_LABELS, buildRoute, composeBriefing, dueText, foldOpportunities, parseRoute, plural, priorityDomains, reasons, standfirst, timeAgo } from "./util.js";
 

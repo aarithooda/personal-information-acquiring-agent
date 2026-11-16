@@ -11,7 +11,7 @@ function fail(error) {
 
 // ---------- Opportunities ----------
 
-function OrganisationPanel({ organisations, reload }) {
+export function OrganisationPanel({ organisations, reload }) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,62 +60,6 @@ function OrganisationPanel({ organisations, reload }) {
         <span class="sub"> ${source.last_error ? `(${source.last_error.slice(0, 90)})` : source.last_ok_at ? `(checked ${timeAgo(source.last_ok_at)})` : "(not checked yet)"}</span></li>`)}</ul>`}
     </div>`)}
   </section>`;
-}
-
-export function Opportunities({ refreshBoot, route }) {
-  const show = route.query.show || "open";
-  const firstYear = route.query.first_year === "1";
-  const type = route.query.type || "";
-  const { data, error, loading, reload, patch } = useLoad(() => api.opportunities({ show, first_year: firstYear, kind: type }), [show, firstYear, type]);
-  const set = (change) => (location.hash = buildRoute(route.path, { ...route.query, ...change, item: undefined }));
-  const track = async (opportunity, status) => {
-    try {
-      await api.track(opportunity.item_id, status);
-      patch((current) => ({ ...current, opportunities: current.opportunities.map((o) => (o.item_id === opportunity.item_id ? { ...o, status } : o)) }));
-      refreshBoot();
-      toast(status ? "Tracking updated" : "No longer tracking");
-    } catch (failure) {
-      fail(failure);
-    }
-  };
-  const counts = data ? data.counts : {};
-  return html`<div class="page">
-    <header class="page-head"><h1>Opportunities</h1>
-      <p>Internships, research programmes, fellowships, summer schools, hackathons and competitions, with deadlines and eligibility up front. Expired ones are never shown as open.</p></header>
-    <${Tabs} value=${show} onChange=${(value) => set({ show: value === "open" ? undefined : value })}
-      tabs=${[{ value: "open", label: "Open", count: counts.open }, { value: "tracked", label: "Tracking", count: counts.tracked }, { value: "expired", label: "Closed", count: counts.expired }]} />
-    <div class="toolbar">
-      <label class="check"><input type="checkbox" checked=${firstYear} onChange=${(event) => set({ first_year: event.target.checked ? "1" : undefined })} /> Open to first-year students${counts.first_year ? ` (${counts.first_year})` : ""}</label>
-      <select aria-label="Type of opportunity" value=${type} onChange=${(event) => set({ type: event.target.value || undefined })}>
-        <option value="">Every type</option>${Object.entries(OPPORTUNITY_TYPES).map(([value, label]) => html`<option value=${value}>${label}</option>`)}</select>
-    </div>
-    ${error && html`<${ErrorNote} message=${error} retry=${reload} />`}
-    ${loading && !data && html`<${Loading} lines=${6} />`}
-    ${data && data.opportunities.length === 0 && html`<${Empty}
-      title=${show === "tracked" ? "You are not tracking anything yet" : show === "expired" ? "Nothing has closed yet" : firstYear || type ? "Nothing matches these filters" : "No open opportunities yet"}
-      hint=${show === "tracked" ? "Set a status on an opportunity (Interested, Planning to apply, Applied) and it appears here." : firstYear || type ? "Clear the filters to see every open opportunity." : "Add the organisations you want watched below, or follow an opportunities source under Sources."}
-      action=${(firstYear || type) && { label: "Clear filters", run: () => set({ first_year: undefined, type: undefined }) }} />`}
-    ${data && data.opportunities.length > 0 && html`<ul class="feed">${data.opportunities.map((o) => html`<li class="opp" style=${hueStyle(o.domain_hue)} key=${o.item_id}>
-      <div class=${"opp-when" + (o.state === "closing" ? " soon" : o.state === "expired" ? " over" : o.state === "undated" ? " none" : "")}>
-        ${o.state === "undated" ? html`<b>No deadline given</b>` : o.state === "expired" ? html`<b>Closed</b><span>${dateTime(o.deadline + "T12:00:00").split(",")[0]}</span>`
-          : html`<b>${o.days_left === 0 ? "Today" : o.days_left}</b><span>${o.days_left === 0 ? "closes" : o.days_left === 1 ? "day left" : "days left"}</span><span>${dateTime(o.deadline + "T12:00:00").split(",")[0]}</span>`}
-      </div>
-      <div>
-        <div class="opp-org">${[o.organisation || o.source_name, OPPORTUNITY_TYPES[o.type], [o.location, o.mode].filter(Boolean).join(", ")].filter(Boolean).join("  /  ")}</div>
-        <h3 class="opp-title"><a href=${buildRoute(route.path, { ...route.query, item: o.item_id })}>${o.programme || o.title}</a></h3>
-        ${(o.eligibility || o.year_requirements || o.summary) && html`<p class="opp-line">${o.eligibility || o.year_requirements || o.summary}</p>`}
-        <div class="row-foot">
-          ${o.first_year === "yes" && html`<span class="badge yes">First-year students can apply</span>`}
-          ${o.first_year === "no" && html`<span class="badge no">Not open to first-years</span>`}
-          ${o.duration && html`<span class="chip">${o.duration}</span>`}
-          ${o.extracted_by !== "model" && !o.deadline && html`<span class="chip" title="Only fields the source supplied are filled in">Details not yet extracted</span>`}
-        </div>
-      </div>
-      <select value=${o.status} aria-label="Your status" onChange=${(event) => track(o, event.target.value)}>
-        <option value="">Not tracking</option>${TRACK_STATUSES.map((s) => html`<option value=${s.value}>${s.label}</option>`)}</select>
-    </li>`)}</ul>`}
-    ${data && html`<${OrganisationPanel} organisations=${data.organisations} reload=${() => { reload(); refreshBoot(); }} />`}
-  </div>`;
 }
 
 // ---------- Sources ----------
